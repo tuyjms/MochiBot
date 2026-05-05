@@ -28,6 +28,7 @@ public class Agent : IAgent
 
     private bool _isProcessing;
     private string _lastEvent = string.Empty;
+    private string _lastJsonError = string.Empty;
 
     // 对话模式 System Prompt 模板
     private const string SystemPromptTemplate = @"
@@ -42,14 +43,6 @@ public class Agent : IAgent
 
 【插件查询】
 你可以调用 list_plugins 工具获取已加载的JS插件列表，然后通过 plugin_call 执行。
-
-你可以通过返回 actions 数组来执行以下操作：
-1. tool_call - 调用基础工具或心情附加工具
-2. plugin_call - 调用已加载的JS插件（需先调用 list_plugins 获取列表）
-3. mcp_call - 调用MCP服务器工具（需先调用 list_plugins 获取列表）
-4. mood_change - 切换你的情绪（happy/sad/sleepy/touched/angry）
-5. midterm_memory - 记录一条重要信息到中期记忆
-6. animation - 播放动画（hug/pet_head/dance/cuddle）
 ";
 
     // 对话模式用户上下文模板
@@ -59,7 +52,7 @@ public class Agent : IAgent
 
 用户说：{UserMessage}
 
-请以AI女友的身份回复，如果需要执行操作，请在回复末尾附上 actions JSON 数组。
+请通过 actions 中的 reply 工具来回复用户，不要直接在 reply 字段中写回复。
 ";
 
     public Agent(
@@ -110,17 +103,23 @@ public class Agent : IAgent
 
             var response = await CallLlmChatAsync(messages);
 
-            // 4. 解析 LLM 响应
-            var (reply, actions) = ParseResponse(response);
+            // 4. 解析 LLM 响应，提取 actions 和可能的 fallback 回复
+            var (fallbackReply, actions) = ParseResponse(response);
 
-            // 5. 执行 actions
-            if (actions != null && actions.Count > 0)
+            // 5. 执行 actions，从中提取 reply 工具的回复文本
+            var reply = await ExecuteActionsAsync(actions);
+
+            // 6. 如果 actions 中没有 reply 但有 fallback 回复（JSON解析失败时），使用 fallback
+            if (string.IsNullOrEmpty(reply) && !string.IsNullOrEmpty(fallbackReply) && fallbackReply != response)
             {
-                await ExecuteActionsAsync(actions);
+                reply = fallbackReply;
             }
 
-            // 6. 记录助手回复到短期记忆
-            _shortTermMemory.AddMessage("assistant", reply);
+            // 7. 如果有回复，记录到短期记忆
+            if (!string.IsNullOrEmpty(reply))
+            {
+                _shortTermMemory.AddMessage("assistant", reply);
+            }
 
             // 7. 检查短期记忆是否溢出
             await CheckMemoryOverflowAsync();
@@ -169,14 +168,17 @@ public class Agent : IAgent
 
             var response = await CallLlmChatAsync(messages);
 
-            var (reply, actions) = ParseResponse(response);
+            // 解析 LLM 响应，提取 actions
+            var (_, actions) = ParseResponse(response);
 
-            if (actions != null && actions.Count > 0)
+            // 执行 actions，从中提取 reply 工具的回复文本
+            var reply = await ExecuteActionsAsync(actions);
+
+            // 如果有回复，记录到短期记忆
+            if (!string.IsNullOrEmpty(reply))
             {
-                await ExecuteActionsAsync(actions);
+                _shortTermMemory.AddMessage("assistant", reply);
             }
-
-            _shortTermMemory.AddMessage("assistant", reply);
 
             return reply;
         }
@@ -291,11 +293,19 @@ public class Agent : IAgent
         var shortTermStr = string.Join("\n", recentMessages.Select(m => $"[{m.Role}] {m.Content}"));
 
         var formatter = new PromptFormatter(UserContextTemplate);
-        return formatter.Format(new Dictionary<string, string>
+        var result = formatter.Format(new Dictionary<string, string>
         {
             { "ShortTermMemory", shortTermStr },
             { "UserMessage", userMessage }
         });
+
+        // 如果有最近一次 JSON 解析错误，追加到 Prompt 末尾提醒 LLM
+        if (!string.IsNullOrEmpty(_lastJsonError))
+        {
+            result += $"\n\n{_lastJsonError}";
+        }
+
+        return result;
     }
 
     /// <summary>调用 LLM 对话模式</summary>
@@ -352,20 +362,27 @@ public class Agent : IAgent
             List<AgentAction>? actions = null;
             if (root.TryGetProperty("actions", out var actionsElement))
             {
-                actions = JsonSerializer.Deserialize<List<AgentAction>>(actionsElement.GetRawText());
+                actions = ParseActionsArray(actionsElement);
             }
 
             return (reply, actions);
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            // 记录最近一次 JSON 解析错误，下次 Prompt 会追加提醒
+            _lastJsonError = $"[JSON解析错误] 你的返回格式有误，请严格按照要求的JSON格式返回。错误: {ex.Message}";
+
+            // 返回原始响应作为 fallback 回复
             return (response, null);
         }
     }
 
-    /// <summary>执行 actions 数组</summary>
-    private async Task ExecuteActionsAsync(List<AgentAction> actions)
+    /// <summary>执行 actions 数组，返回从 reply 工具中提取的回复文本（如果没有 reply 则返回空字符串）</summary>
+    private async Task<string> ExecuteActionsAsync(List<AgentAction>? actions)
     {
+        var replyText = string.Empty;
+        if (actions == null || actions.Count == 0) return replyText;
+
         var maxActions = _appSettings.MaxActionsPerResponse;
         var count = 0;
 
@@ -379,11 +396,30 @@ public class Agent : IAgent
                 switch (action.Type)
                 {
                     case "tool_call":
-                        var toolResult = await _toolService.ExecuteToolAsync(
-                            action.Name ?? "",
-                            action.Parameters ?? "{}");
-                        _shortTermMemory.AddMessage("system",
-                            $"[工具执行] {action.Name}: {(toolResult.Success ? "成功" : $"失败: {toolResult.Error}")}");
+                        // 如果是 reply 工具，提取回复文本
+                        if (action.Name == "reply" && !string.IsNullOrEmpty(action.Parameters))
+                        {
+                            try
+                            {
+                                using var doc = JsonDocument.Parse(action.Parameters);
+                                if (doc.RootElement.TryGetProperty("reply_text", out var replyElement))
+                                {
+                                    replyText = replyElement.GetString() ?? string.Empty;
+                                }
+                            }
+                            catch
+                            {
+                                // 解析失败则忽略
+                            }
+                        }
+                        else
+                        {
+                            var toolResult = await _toolService.ExecuteToolAsync(
+                                action.Name ?? "",
+                                action.Parameters ?? "{}");
+                            _shortTermMemory.AddMessage("system",
+                                $"[工具执行] {action.Name}: {(toolResult.Success ? "成功" : $"失败: {toolResult.Error}")}");
+                        }
                         break;
 
                     case "plugin_call":
@@ -434,6 +470,8 @@ public class Agent : IAgent
                 _shortTermMemory.AddMessage("system", $"[执行错误] {action.Type}: {ex.Message}");
             }
         }
+
+        return replyText;
     }
 
     /// <summary>检查短期记忆是否溢出</summary>
@@ -466,6 +504,54 @@ public class Agent : IAgent
             {
             }
         }
+    }
+
+    /// <summary>手动解析 actions 数组，兼容 parameters 为对象的情况</summary>
+    private static List<AgentAction>? ParseActionsArray(JsonElement actionsElement)
+    {
+        if (actionsElement.ValueKind != JsonValueKind.Array) return null;
+
+        var actions = new List<AgentAction>();
+        foreach (var item in actionsElement.EnumerateArray())
+        {
+            var action = new AgentAction();
+
+            if (item.TryGetProperty("type", out var typeProp))
+                action.Type = typeProp.GetString() ?? string.Empty;
+
+            if (item.TryGetProperty("name", out var nameProp))
+                action.Name = nameProp.GetString();
+
+            if (item.TryGetProperty("server_name", out var serverProp))
+                action.ServerName = serverProp.GetString();
+
+            if (item.TryGetProperty("mood", out var moodProp))
+                action.Mood = moodProp.GetString();
+
+            if (item.TryGetProperty("description", out var descProp))
+                action.Description = descProp.GetString();
+
+            if (item.TryGetProperty("animation", out var animProp))
+                action.Animation = animProp.GetString();
+
+            if (item.TryGetProperty("importance", out var impProp))
+                action.Importance = impProp.GetInt32();
+
+            // parameters 可能是对象或字符串，统一转为 JSON 字符串
+            if (item.TryGetProperty("parameters", out var paramsProp))
+            {
+                action.Parameters = paramsProp.ValueKind switch
+                {
+                    JsonValueKind.String => paramsProp.GetString(),
+                    JsonValueKind.Object or JsonValueKind.Array => paramsProp.GetRawText(),
+                    _ => paramsProp.GetRawText()
+                };
+            }
+
+            actions.Add(action);
+        }
+
+        return actions;
     }
 
     /// <summary>解析关键词 JSON</summary>
