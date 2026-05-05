@@ -23,6 +23,28 @@ Services/
 └── ...
 ```
 
+## 配置管理规范
+
+所有配置项必须通过 **配置读取器（ConfigReader）** 统一管理，禁止在各模块中硬编码配置参数。
+
+### 新增配置项流程
+
+1. **发起协商**：在对应模块的 md 文档中描述新增配置项的名称、类型、默认值、用途
+2. **注册到配置读取器**：在 `doc/14-配置读取器.md` 中更新数据模型和 `appsettings.json` 结构
+3. **实现代码**：在 `ConfigReader.cs` 中添加对应的属性或方法
+4. **更新文档**：同步更新 `doc/01-项目架构总览.md` 和 `doc/10-接口调用关系与协作图.md`
+
+> 禁止在各模块中直接硬编码配置参数，所有配置必须走 ConfigReader 统一流程。
+
+## 日志规范
+
+所有模块必须通过 **配置读取器的 Logger** 打印日志，禁止直接使用 `Console.WriteLine` 或其他日志方式。
+
+- Logger 由 ConfigReader 统一初始化和管理
+- 各模块通过 `ConfigReader.Instance.Logger` 获取日志实例
+- 日志级别：Debug / Info / Warn / Error
+- 日志输出到控制台和文件（`Resources/Logs/` 目录）
+
 ## 单元测试
 
 因为在项目起步期，无法直接运行项目来测试模块。所以我写了这个。
@@ -38,7 +60,8 @@ Services/
 catgirlwindow.Tests/
 ├── catgirlwindow.Tests.csproj    # 测试项目配置
 ├── Services/                     # 服务层测试
-│   └── DatabaseServiceTests.cs   # 数据库业务层测试
+│   ├── DatabaseServiceTests.cs   # 数据库业务层测试
+│   └── ConfigReaderTests.cs      # 配置读取器测试
 └── Models/                       # 模型测试（预留）
 ```
 
