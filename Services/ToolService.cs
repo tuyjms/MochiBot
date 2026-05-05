@@ -50,36 +50,6 @@ public class ToolService : IToolService, IDisposable
     // 心情附加工具
     private static readonly Dictionary<AgentMood, ToolDefinition> MoodTools = new()
     {
-        [AgentMood.Sad] = new ToolDefinition
-        {
-            Name = "hug",
-            Description = "拥抱AI女友，她会感到温暖和安慰（当前心情Sad时可用）",
-            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", new string[] { } } }
-        },
-        [AgentMood.Happy] = new ToolDefinition
-        {
-            Name = "dance",
-            Description = "和AI女友一起跳舞，她会更开心（当前心情Happy时可用）",
-            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", new string[] { } } }
-        },
-        [AgentMood.Sleepy] = new ToolDefinition
-        {
-            Name = "tuck_in",
-            Description = "给AI女友盖好被子，哄她睡觉（当前心情Sleepy时可用）",
-            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", new string[] { } } }
-        },
-        [AgentMood.Touched] = new ToolDefinition
-        {
-            Name = "cuddle",
-            Description = "和AI女友依偎在一起（当前心情Touched时可用）",
-            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", new string[] { } } }
-        },
-        [AgentMood.Angry] = new ToolDefinition
-        {
-            Name = "calm_down",
-            Description = "安抚生气的AI女友（当前心情Angry时可用）",
-            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", new string[] { } } }
-        }
     };
 
     public ToolService(LlmClient llmClient, IAgentMoodTracker moodTracker, IPromptFormatter formatter)
@@ -89,16 +59,61 @@ public class ToolService : IToolService, IDisposable
         _formatter = formatter ?? throw new ArgumentNullException(nameof(formatter));
     }
 
+    /// <summary>获取工具调用格式的 Prompt 说明（与基础工具描述一起使用）</summary
     public List<ToolDefinition> GetToolDefinitions()
     {
-        return new List<ToolDefinition>
+        var tools = new List<ToolDefinition>
         {
-            new() { Name = "timer", Description = "启动一个倒计时，倒计时结束后会提醒用户", InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object> { { "seconds", new Dictionary<string, object> { { "type", "integer" }, { "description", "倒计时秒数" }, { "minimum", 10 }, { "maximum", 3600 } } } } }, { "required", new[] { "seconds" } } } },
-            new() { Name = "compliment", Description = "随机说一句夸奖用户的话，让用户感到被鼓励和温暖", InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", new string[] { } } } },
-            new() { Name = "pet", Description = "摸摸AI女友的头，她会感到开心和感动", InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", new string[] { } } } },
-            new() { Name = "weather", Description = "查询指定城市的当前天气和今日天气预报", InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object> { { "city", new Dictionary<string, object> { { "type", "string" }, { "description", "城市名称，为空则自动获取IP所在城市" } } } } }, { "required", new string[] { } } } },
-            new() { Name = "list_plugins", Description = "列出所有已加载的JS插件和MCP服务器工具及其描述", InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", new string[] { } } } }
+            new() { Name = "timer", Description = "启动一个倒计时，倒计时结束后会提醒用户", 
+                    InputSchema = new Dictionary<string, object> { 
+                        { "type", "object" },
+                        { "properties", new Dictionary<string, object> { 
+                        { "seconds", new Dictionary<string, object> {
+                        { "type", "integer" }, 
+                        { "description", "倒计时秒数" }, 
+                        { "minimum", 10 }, { "maximum", 3600 } } } } },
+                        { "required", new[] { "seconds" } } } },
+            new() { Name = "compliment", Description = "随机说一句夸奖用户的话，让用户感到被鼓励和温暖", 
+                InputSchema = new Dictionary<string, object> {
+                     { "type", "object" }, 
+                     { "properties", new Dictionary<string, object>() }, 
+                     { "required", new string[] { } } } },
+            new() { Name = "weather", Description = "查询指定城市的当前天气和今日天气预报", 
+            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object> { { "city", new Dictionary<string, object> { { "type", "string" }, { "description", "城市名称，为空则自动获取IP所在城市" } } } } }, { "required", new string[] { } } } },
+            new() { Name = "list_plugins", Description = "列出所有已加载的JS插件和MCP服务器工具及其描述", 
+            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", new string[] { } } } },
+            new() { Name = "reply", Description = "回复用户说的话。如果不调用此工具，则表示不回复（保持沉默）。调用此工具时，reply_text 参数为你要说的话",
+            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object> { { "reply_text", new Dictionary<string, object> { { "type", "string" }, { "description", "你要对用户说的话" } } } } }, { "required", new[] { "reply_text" } } } }
         };
+
+        // 附加工具调用格式说明（作为虚拟工具注入，供 LLM 理解返回格式）
+        tools.Add(new ToolDefinition
+        {
+            Name = "_format_instruction",
+            Description = @"【工具调用格式说明】
+你必须返回一个 JSON 对象，包含 actions 数组。格式如下：
+{
+  ""actions"": [
+    {""type"": ""tool_call"", ""name"": ""reply"", ""parameters"": {""reply_text"": ""你要说的话""}},
+    {""type"": ""tool_call"", ""name"": ""timer"", ""parameters"": {""seconds"": 300}}
+  ]
+}
+
+actions 数组中每个元素的 type 可以是：
+1. tool_call - 调用基础工具或心情附加工具（包括 reply）
+2. plugin_call - 调用已加载的JS插件（需先调用 list_plugins 获取列表）
+3. mcp_call - 调用MCP服务器工具（需先调用 list_plugins 获取列表）
+4. mood_change - 切换你的情绪（happy/sad/sleepy/touched/angry）
+5. midterm_memory - 记录一条重要信息到中期记忆
+
+【重要规则】
+- 回复用户必须通过调用 reply 工具，在 reply_text 参数中填写你要说的话。
+- 如果你不想回复（比如没什么好说的、或者不想打扰用户），就不要调用 reply 工具，保持沉默。
+- 其他工具（timer/compliment/pet/weather 等）可以配合 reply 一起使用，也可以单独使用。",
+            InputSchema = new Dictionary<string, object>()
+        });
+
+        return tools;
     }
 
     public List<ToolDefinition> GetMoodBasedTools(AgentMood currentMood)
@@ -243,10 +258,16 @@ public class ToolService : IToolService, IDisposable
         try
         {
             var template = _formatter.Format(new Dictionary<string, string> { { "type", "compliment" } });
-            var result = await _llmClient.SendChatAsync("default", "gpt-4o-mini", template);
+            // 使用第一个可用的提供商
+            var providers = _llmClient.GetAvailableProviders().ToList();
+            var provider = providers.FirstOrDefault() ?? "default";
+            var result = await _llmClient.SendChatAsync(provider, "gpt-4o-mini", template);
             if (!string.IsNullOrWhiteSpace(result)) return result.Trim();
         }
-        catch { }
+        catch
+        {
+            System.Diagnostics.Debug.WriteLine("[ToolService] LLM夸奖失败，使用本地模板");
+        }
         return ComplimentTemplates[_random.Next(ComplimentTemplates.Length)];
     }
 
