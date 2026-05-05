@@ -39,7 +39,16 @@ public class LlmClient
         return providers;
     }
 
-    public async Task<string> SendChatAsync(string providerName, string model, string prompt)
+    public virtual async Task<string> SendChatAsync(string providerName, string model, string prompt)
+    {
+        var messages = new List<ChatMessage>
+        {
+            new UserChatMessage(prompt)
+        };
+        return await SendChatAsync(providerName, model, messages);
+    }
+
+    public virtual async Task<string> SendChatAsync(string providerName, string model, List<ChatMessage> messages)
     {
         if (!_providers.TryGetValue(providerName, out var config))
         {
@@ -52,10 +61,6 @@ public class LlmClient
         });
 
         var chatClient = client.GetChatClient(model);
-        var messages = new List<ChatMessage>
-        {
-            new UserChatMessage(prompt)
-        };
 
         var completion = await chatClient.CompleteChatAsync(messages);
         return completion.Value.Content[0].Text;

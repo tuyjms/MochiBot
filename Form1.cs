@@ -1,23 +1,40 @@
-using System.Net.Http;
-using System.Text;
-using System.Text.Json;
+using catgirlwindow.Services;
+using catgirlwindow.Services.Config;
 
 namespace catgirlwindow;
 
 public partial class Form1 : Form
 {
     private readonly LlmClient _llmClient = new();
+    private readonly IAgent _agent;
 
     public Form1()
     {
         InitializeComponent();
+
+        // 初始化 Agent 依赖
+        var configReader = new ConfigReader();
+        var shortTermMemory = new ShortTermMemory(50);
+        var moodTracker = new AgentMoodTracker();
+        var formatter = new PromptFormatter("");
+        var toolService = new ToolService(_llmClient, moodTracker, formatter);
+
+        // 创建 Agent（不传中期/长期记忆）
+        _agent = new Agent(
+            _llmClient,
+            configReader,
+            formatter,
+            shortTermMemory,
+            toolService,
+            moodTracker);
+
         InitializeProviders();
     }
 
     private void InitializeProviders()
     {
         comboBoxProvider.Items.AddRange(_llmClient.GetAvailableProviders().ToArray());
-        comboBoxProvider.SelectedIndex = 0; // Default to first provider
+        comboBoxProvider.SelectedIndex = 0;
     }
 
     private async void buttonSend_Click(object sender, EventArgs e)
@@ -48,21 +65,19 @@ public partial class Form1 : Form
             return;
         }
 
-        var provider = comboBoxProvider.SelectedItem?.ToString() ?? "LocalLMStudio";
-        var model = textBoxModel.Text.Trim();
-
-        AppendChat("User", prompt);
+        AppendChat("你", prompt);
         textBoxPrompt.Clear();
         buttonSend.Enabled = false;
 
         try
         {
-            var response = await _llmClient.SendChatAsync(provider, model, prompt);
-            AppendChat("Assistant", response);
+            // 使用 Agent 处理用户输入
+            var response = await _agent.ProcessUserInputAsync(prompt);
+            AppendChat("小琪", response);
         }
         catch (Exception ex)
         {
-            AppendChat("Error", ex.Message);
+            AppendChat("错误", ex.Message);
         }
         finally
         {

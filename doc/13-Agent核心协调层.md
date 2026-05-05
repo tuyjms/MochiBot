@@ -238,66 +238,16 @@ Agent 依赖：LlmClient, PromptFormatter, ShortTermMemory, MidTermMemory, LongT
 
 依赖 Agent：Form1（UI层）, AutoEventService
 
-## 单元测试
+## 关于单元测试
 
-### 测试要点
+Agent 核心协调层**不需要编写单元测试**。原因如下：
 
-| 测试用例 | 预期结果 |
-| ---------- | ---------- |
-| 处理用户输入返回回复 | ProcessUserInputAsync 返回非空字符串 |
-| 处理自动事件返回回复 | ProcessAutoEventAsync 返回非空字符串 |
-| 记忆总结返回摘要 | SummarizeMemoryAsync 返回非空摘要 |
-| 关键词提取返回三个词 | ExtractKeywordsAsync 返回三个非空关键词 |
-| 重要度评估返回 0-100 | EvaluateImportanceAsync 返回 0-100 的整数 |
-| 工具调用返回结果 | ProcessToolCallAsync 返回执行结果 |
-| 插件调用返回结果 | ProcessPluginCallAsync 返回执行结果 |
-| MCP调用返回结果 | ProcessMcpCallAsync 返回执行结果 |
-| 获取状态返回有效信息 | GetStatus 返回非空状态 |
+- Agent 不是独立的功能模块，而是 LLM 操作模块的"操作系统"
+- Agent 的核心逻辑是协调和调度其他模块，其正确性依赖于各子模块的正确性
+- Agent 的测试需要完整的 LLM 调用链，单元测试无法覆盖真实场景
+- Agent 的正确性通过整体集成测试来验证
 
-### 测试方法
-
-```csharp
-[Fact]
-public async Task ProcessUserInput_ShouldReturnReply()
-{
-    var agent = new Agent(/* mock dependencies */);
-    var reply = await agent.ProcessUserInputAsync("你好");
-    Assert.False(string.IsNullOrEmpty(reply));
-}
-
-[Fact]
-public async Task ProcessAutoEvent_ShouldReturnReply()
-{
-    var agent = new Agent(/* mock dependencies */);
-    var reply = await agent.ProcessAutoEventAsync("murmur");
-    Assert.False(string.IsNullOrEmpty(reply));
-}
-
-[Fact]
-public async Task EvaluateImportance_ShouldReturnValidScore()
-{
-    var agent = new Agent(/* mock dependencies */);
-    var score = await agent.EvaluateImportanceAsync("用户提到下周要去面试");
-    Assert.InRange(score, 0, 100);
-}
-
-[Fact]
-public void GetStatus_ShouldReturnValidStatus()
-{
-    var agent = new Agent(/* mock dependencies */);
-    var status = agent.GetStatus();
-    Assert.NotNull(status);
-    Assert.False(string.IsNullOrEmpty(status.CurrentMood));
-}
-
-[Fact]
-public async Task ProcessToolCall_NonExisting_ShouldReturnError()
-{
-    var agent = new Agent(/* mock dependencies */);
-    var result = await agent.ProcessToolCallAsync("nonexistent", "");
-    Assert.NotNull(result);
-}
-```
+> 详见 `doc/00 - 写给viber的话.md` 中"不需要单元测试的模块"章节的说明。
 
 ## 配置参数
 
