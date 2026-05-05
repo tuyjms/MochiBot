@@ -69,6 +69,9 @@ Desktop.ini
 appsettings.Development.json
 appsettings.User.json
 
+# 施工笔记
+mywork.md
+
 # 文档生成
 doc/.vitepress/dist/
 doc/node_modules/
