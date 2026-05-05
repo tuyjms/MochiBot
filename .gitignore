@@ -1,0 +1,80 @@
+# .NET Core / .NET 项目
+bin/
+obj/
+*.user
+*.suo
+*.sln.docstates
+*.userprefs
+
+# 构建输出
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# NuGet
+*.nupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+*.nuget.props
+*.nuget.targets
+.nuget/
+
+# Visual Studio
+.vs/
+*.csproj.user
+*.csproj.user.*
+*.dbmdl
+*.jfm
+*.rsuser
+*.vssscc
+.vscode/settings.json
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# 运行时生成的文件
+*.dll
+*.exe
+*.pdb
+*.so
+*.dylib
+
+# 测试结果
+TestResults/
+[Tt]est[Rr]esult*
+*.trx
+*.coverage
+*.coveragexml
+
+# 日志文件
+*.log
+*.tmp
+
+# 操作系统文件
+Thumbs.db
+*.DS_Store
+Desktop.ini
+
+# 用户配置文件
+appsettings.Development.json
+appsettings.User.json
+
+# 文档生成
+doc/.vitepress/dist/
+doc/node_modules/
+
+# 资源文件（保留目录结构，忽略具体内容）
+Resources/Data/*.json
+Resources/Data/*.db
+Resources/Data/*.db-shm
+Resources/Data/*.db-wal

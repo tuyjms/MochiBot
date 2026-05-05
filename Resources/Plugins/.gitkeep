@@ -1,0 +1,7 @@
+# JS插件目录
+# 每个插件一个子文件夹，包含 manifest.json 和 main.js
+# 例如:
+#   weather/manifest.json
+#   weather/main.js
+#   compliment/manifest.json
+#   compliment/main.js

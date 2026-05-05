@@ -1,0 +1,4 @@
+# 数据文件目录 - 运行时自动生成
+# config.json - 用户配置
+# chat_history.json - 聊天记录
+# mood_log.json - 情绪日志
