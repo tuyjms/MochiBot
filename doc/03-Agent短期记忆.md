@@ -143,7 +143,7 @@ public interface IShortTermMemory
 ### 测试要点
 
 | 测试用例 | 预期结果 |
-|----------|----------|
+| ---------- | ---------- |
 | 添加消息后 Count 增加 | AddMessage 后 Count == 1 |
 | 获取最近 N 条消息 | GetRecentMessages(N) 返回正确条数 |
 | 环形缓冲区溢出时自动覆盖 | 添加超过 Capacity 条后，最旧消息被覆盖 |

@@ -1,10 +1,10 @@
 # MochiBot - AI女友桌面助手
 
-一个基于 .NET 10.0 的 Windows 桌面应用，以 Live2D 形象呈现的 AI 女友助手。
+一个基于 .NET 10.0 的 Windows 桌面应用 AI 桌宠。
 
 ## 功能特性
 
-- 🎮 **Live2D 交互** — 动态角色渲染，根据情绪切换表情动作
+- 🎮 **角色渲染** — 动态角色渲染，根据情绪切换表情动作
 - 💬 **AI 对话** — 接入 LLM，支持自然语言聊天
 - 🧠 **三层记忆系统** — 短期记忆（环形缓冲区）+ 中期记忆 + 长期记忆（SQLite）
 - 🎯 **工具功能** — 计时器、随机夸奖、摸摸她、天气预报
@@ -62,7 +62,7 @@ MochiBot/
 │   ├── IPromptFormatter.cs   # Prompt 格式化
 │   └── IToolService.cs       # 工具功能
 ├── Plugins/                  # 插件接口
-├── Renderer/                 # Live2D 渲染接口
+├── Renderer/                 # 渲染接口
 ├── Resources/                # 资源目录
 │   ├── Data/                 # 运行时数据
 │   ├── Images/               # 图片资源
@@ -78,7 +78,7 @@ MochiBot/
     ├── 03-Agent短期记忆.md
     ├── 04-数据库业务层.md
     ├── 05-JS插件加载器.md
-    ├── 06-Live2D渲染器.md
+    ├── 06-2D渲染器.md
     ├── 07-Prompt格式化器.md
     ├── 08-工具功能服务.md
     ├── 09-自动事件服务.md
@@ -92,7 +92,7 @@ MochiBot/
 
 - **框架**: .NET 10.0 (Windows Forms)
 - **AI**: OpenAI API / 兼容接口
-- **渲染**: Live2D SDK
+- **渲染**: GIF/PNG图集
 - **存储**: SQLite (Microsoft.Data.Sqlite)
 - **测试**: xUnit + coverlet
 - **扩展**: JavaScript 插件引擎

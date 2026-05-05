@@ -184,7 +184,7 @@ public async Task<int> EvaluateImportanceAsync(string content)
 2. 构建完整 Prompt：PromptFormatter 构建 system prompt（含长期记忆检索）+ user context（含短期/中期记忆）+ Agent 指令
 3. LlmClient.SendChatAsync(messages) 对话模式调用
 4. 解析 LLM 响应：提取 reply 文本 + 解析 actions 数组
-5. 遍历执行 actions：tool_call → ToolService、plugin_call → JsPluginLoader、mood_change → AgentMoodTracker、midterm_memory → MidTermMemory、animation → Live2dRenderer
+5. 遍历执行 actions：tool_call → ToolService、plugin_call → JsPluginLoader、mood_change → AgentMoodTracker、midterm_memory → MidTermMemory、animation → 2dRenderer
 6. 短期记忆.AddMessage("assistant", reply)
 7. 检查短期记忆是否溢出，如果溢出则按概率抽取，用函数模式 EvaluateImportanceAsync() 评估重要度后录入 MidTermMemory
 8. AgentMoodTracker.UpdateMoodByEvent("Active")
@@ -234,7 +234,7 @@ public class AutoEventService : IAutoEventService
 
 ## 依赖关系
 
-Agent 依赖：LlmClient, PromptFormatter, ShortTermMemory, MidTermMemory, LongTermMemory, ToolService, JsPluginLoader, AgentMoodTracker, Live2dRenderer, DatabaseService
+Agent 依赖：LlmClient, PromptFormatter, ShortTermMemory, MidTermMemory, LongTermMemory, ToolService, JsPluginLoader, AgentMoodTracker, 2dRenderer, DatabaseService
 
 依赖 Agent：Form1（UI层）, AutoEventService
 
@@ -243,7 +243,7 @@ Agent 依赖：LlmClient, PromptFormatter, ShortTermMemory, MidTermMemory, LongT
 ### 测试要点
 
 | 测试用例 | 预期结果 |
-|----------|----------|
+| ---------- | ---------- |
 | 处理用户输入返回回复 | ProcessUserInputAsync 返回非空字符串 |
 | 处理自动事件返回回复 | ProcessAutoEventAsync 返回非空字符串 |
 | 记忆总结返回摘要 | SummarizeMemoryAsync 返回非空摘要 |

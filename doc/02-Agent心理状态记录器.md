@@ -78,7 +78,7 @@ public interface IAgentMoodTracker
 ### 测试要点
 
 | 测试用例 | 预期结果 |
-|----------|----------|
+| ---------- | ---------- |
 | 初始状态为 Neutral | CurrentMood == Neutral |
 | 调用 SetMood(Happy) | CurrentMood 切换为 Happy，触发 MoodChanged 事件 |
 | 调用 UpdateMoodByEvent("LateNight") | CurrentMood 切换为 Sleepy |
@@ -120,4 +120,4 @@ public void MoodChanged_ShouldFireOnSetMood()
 ## 依赖关系
 
 - **依赖**: `DatabaseService`（记录情绪日志）
-- **被依赖**: `Form1`（UI订阅MoodChanged事件）、`PromptFormatter`（获取当前情绪构建prompt）、`Live2dRenderer`（根据情绪切换模型动作）
+- **被依赖**: `Form1`（UI订阅MoodChanged事件）、`PromptFormatter`（获取当前情绪构建prompt）、`2dRenderer`（根据情绪切换模型动作）
