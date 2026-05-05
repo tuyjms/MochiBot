@@ -24,8 +24,6 @@ public class ConfigReaderTests : IDisposable
                 }
             },
             "AppSettings": {
-                "DefaultProvider": "TestProvider",
-                "ChatModel": "test-model",
                 "ActivePersonality": "测试人格",
                 "EnableStructuredResponse": true
             },
@@ -112,7 +110,6 @@ public class ConfigReaderTests : IDisposable
     public void GetAppSettings_ShouldReturnSettings()
     {
         var settings = ConfigReader.Instance.GetAppSettings();
-        Assert.Equal("TestProvider", settings.DefaultProvider);
         Assert.True(settings.ActivePersonality == "测试人格", "ActivePersonality should be '测试人格'");
         Assert.True(settings.EnableStructuredResponse);
     }
@@ -190,12 +187,12 @@ public class ConfigReaderTests : IDisposable
         File.WriteAllText(_testConfigPath, """
         {
             "Providers": {},
-            "AppSettings": { "DefaultProvider": "NewProvider", "ActivePersonality": "" },
+            "AppSettings": { "ActivePersonality": "新人格" },
             "ModuleSettings": {}
         }
         """);
         ConfigReader.Instance.Reload();
-        Assert.Equal("NewProvider", ConfigReader.Instance.GetAppSettings().DefaultProvider);
+        Assert.Equal("新人格", ConfigReader.Instance.GetAppSettings().ActivePersonality);
 
         // 恢复原始配置，避免污染后续测试
         Reinitialize();

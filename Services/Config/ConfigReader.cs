@@ -273,9 +273,6 @@ public class ConfigReader : IConfigReader, IDisposable
         var settings = new AppSettings();
         if (root.TryGetProperty("AppSettings", out var appSettingsElement))
         {
-            settings.DefaultProvider = GetStringProperty(appSettingsElement, "DefaultProvider", "LocalLMStudio");
-            settings.ChatModel = GetStringProperty(appSettingsElement, "ChatModel", "default");
-            settings.FunctionModel = GetStringProperty(appSettingsElement, "FunctionModel", "default");
             settings.ActivePersonality = GetStringProperty(appSettingsElement, "ActivePersonality", "default");
             settings.EnableStructuredResponse = GetBoolProperty(appSettingsElement, "EnableStructuredResponse", true);
             settings.MaxActionsPerResponse = GetIntProperty(appSettingsElement, "MaxActionsPerResponse", 5);

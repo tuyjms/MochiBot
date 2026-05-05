@@ -5,15 +5,6 @@ namespace catgirlwindow.Services.Config.Models;
 /// </summary>
 public class AppSettings
 {
-    /// <summary>默认使用的提供商名称</summary>
-    public string DefaultProvider { get; set; } = "LocalLMStudio";
-
-    /// <summary>对话模式使用的模型名称（默认值，人格配置可覆盖）</summary>
-    public string ChatModel { get; set; } = "default";
-
-    /// <summary>函数模式使用的模型名称（可指定更便宜的模型）</summary>
-    public string FunctionModel { get; set; } = "default";
-
     /// <summary>当前激活的人格名称（对应 Resources/Personalities/ 下的 {名称}_person.json）</summary>
     public string ActivePersonality { get; set; } = "default";
 

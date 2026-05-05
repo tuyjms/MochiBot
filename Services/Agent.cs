@@ -308,11 +308,50 @@ public class Agent : IAgent
         return result;
     }
 
+    /// <summary>从模型名中提取提供商（格式："{提供商}/{模型名}"）</summary>
+    private static (string provider, string model) ParseModelName(string modelFullName)
+    {
+        if (string.IsNullOrEmpty(modelFullName) || modelFullName == "default")
+            return ("LocalLMStudio", "default");
+
+        var parts = modelFullName.Split('/', 2);
+        if (parts.Length == 2)
+            return (parts[0], parts[1]);
+
+        return ("LocalLMStudio", modelFullName);
+    }
+
+    /// <summary>获取对话模型名称（优先从人格配置读取）</summary>
+    private string GetChatModel()
+    {
+        // 从人格配置的第一个子人格中获取模型
+        if (_personality?.Personalities?.Count > 0 &&
+            _personality.Personalities[0].ChatModels?.Count > 0)
+        {
+            return _personality.Personalities[0].ChatModels[0];
+        }
+        return "default";
+    }
+
+    /// <summary>获取函数模型名称（优先从人格配置读取，没有则用对话模型）</summary>
+    private string GetFunctionModel()
+    {
+        // 从人格配置的第一个子人格中获取函数模型，没有则用对话模型
+        if (_personality?.Personalities?.Count > 0)
+        {
+            var sub = _personality.Personalities[0];
+            if (sub.FunctionModels?.Count > 0)
+                return sub.FunctionModels[0];
+            if (sub.ChatModels?.Count > 0)
+                return sub.ChatModels[0];
+        }
+        return "default";
+    }
+
     /// <summary>调用 LLM 对话模式</summary>
     private async Task<string> CallLlmChatAsync(List<ChatMessage> messages)
     {
-        var provider = _appSettings.DefaultProvider;
-        var model = _appSettings.ChatModel;
+        var (provider, model) = ParseModelName(GetChatModel());
 
         var openAiMessages = messages.Select(m => m.Role switch
         {
@@ -328,8 +367,7 @@ public class Agent : IAgent
     /// <summary>调用 LLM 函数模式</summary>
     private async Task<string> CallLlmFunctionAsync(List<ChatMessage> messages)
     {
-        var provider = _appSettings.DefaultProvider;
-        var model = _appSettings.FunctionModel;
+        var (provider, model) = ParseModelName(GetFunctionModel());
 
         var openAiMessages = messages.Select(m => m.Role switch
         {

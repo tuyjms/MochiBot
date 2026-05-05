@@ -102,6 +102,7 @@ partial class Form1
         this.comboBoxProvider.Name = "comboBoxProvider";
         this.comboBoxProvider.Size = new System.Drawing.Size(420, 23);
         this.comboBoxProvider.TabIndex = 5;
+        this.comboBoxProvider.SelectedIndexChanged += new System.EventHandler(this.comboBoxProvider_SelectedIndexChanged);
         // 
         // richTextChat
         // 

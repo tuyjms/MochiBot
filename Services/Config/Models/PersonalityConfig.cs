@@ -39,4 +39,11 @@ public class SubPersonality
     /// 格式同上，为空时使用 ChatModels 的第一个
     /// </summary>
     public List<string>? VisionModels { get; set; }
+
+    /// <summary>
+    /// 函数调用LLM模型列表（可选，按优先级排序，支持故障转移）
+    /// 用于摘要、关键词提取、重要性评估等后台任务
+    /// 格式同上，为空时使用 ChatModels 的第一个
+    /// </summary>
+    public List<string>? FunctionModels { get; set; }
 }
