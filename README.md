@@ -1,6 +1,6 @@
 # MochiBot - AI女友桌面助手
 
-一个基于 .NET 9.0 的 Windows 桌面应用，以 Live2D 形象呈现的 AI 女友助手。
+一个基于 .NET 10.0 的 Windows 桌面应用，以 Live2D 形象呈现的 AI 女友助手。
 
 ## 功能特性
 
@@ -16,7 +16,7 @@
 
 ### 前置条件
 
-- [.NET 9.0 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+- [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - Git
 
 ### 克隆与运行
@@ -39,7 +39,7 @@ dotnet run
 
 ## 项目结构
 
-```
+```txt
 MochiBot/
 ├── Form1.cs                  # 主窗口（UI层）
 ├── Form1.Designer.cs         # 窗口设计器
@@ -67,6 +67,10 @@ MochiBot/
 │   ├── Data/                 # 运行时数据
 │   ├── Images/               # 图片资源
 │   └── Plugins/              # JS 插件
+├── catgirlwindow.Tests/      # 单元测试项目
+│   ├── Services/             # 服务层测试
+│   │   └── DatabaseServiceTests.cs
+│   └── Models/               # 模型测试（预留）
 └── doc/                      # 项目文档
     ├── 00 - 写给viber的话.md  # 协作规范
     ├── 01-项目架构总览.md      # 架构总览
@@ -86,11 +90,22 @@ MochiBot/
 
 ## 技术栈
 
-- **框架**: .NET 9.0 (Windows Forms)
+- **框架**: .NET 10.0 (Windows Forms)
 - **AI**: OpenAI API / 兼容接口
 - **渲染**: Live2D SDK
-- **存储**: JSON 文件 + SQLite
+- **存储**: SQLite (Microsoft.Data.Sqlite)
+- **测试**: xUnit + coverlet
 - **扩展**: JavaScript 插件引擎
+
+## 运行测试
+
+```bash
+# 运行所有单元测试
+dotnet test
+
+# 运行带覆盖率报告的测试
+dotnet test --collect:"XPlat Code Coverage"
+```
 
 ## 贡献指南
 

@@ -32,13 +32,14 @@ Services/
 
 ### 测试项目结构
 
-测试项目位于 `catgirlwindow.Tests/` 目录下，使用 xUnit 框架 + SQLite 文件数据库（每个测试用例独立文件，自动清理）。
+测试项目位于 `catgirlwindow.Tests/` 目录下，使用 xUnit 框架 + SQLite 文件数据库（每个测试用例独立文件，自动清理）。测试文件按服务类别分文件夹存放。
 
 ```txt
 catgirlwindow.Tests/
 ├── catgirlwindow.Tests.csproj    # 测试项目配置
-├── DatabaseServiceTests.cs       # 数据库业务层测试
-└── UnitTest1.cs                  # 默认示例（可删除）
+├── Services/                     # 服务层测试
+│   └── DatabaseServiceTests.cs   # 数据库业务层测试
+└── Models/                       # 模型测试（预留）
 ```
 
 ### 运行测试
@@ -58,12 +59,13 @@ dotnet test catgirlwindow.Tests/catgirlwindow.Tests.csproj --filter "FullyQualif
 3. **SQLite 连接池**：测试连接字符串需添加 `Pooling=False`，确保每个测试用例的数据库文件可被正确清理
 4. **文件清理**：`Dispose()` 中使用 `try/catch` 包裹文件删除，避免因文件锁定导致测试失败
 5. **独立数据库文件**：每个测试用例使用 `Guid.NewGuid()` 生成唯一文件名，避免并行测试冲突
+6. **按文件夹分类**：测试文件按对应模块类别放入 `Services/`、`Models/` 等子文件夹，保持结构清晰
 
 ## 开发环境搭建
 
 ### 前置条件
 
-- [.NET 9.0 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+- [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - Git
 
 ### 克隆与运行
