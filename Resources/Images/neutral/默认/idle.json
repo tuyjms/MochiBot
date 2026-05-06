@@ -1,0 +1,11 @@
+{
+  "type": "sprite",
+  "file": "idle.png",
+  "frameWidth": 512,
+  "frameHeight": 689,
+  "totalFrames": 6,
+  "columns": 6,
+  "rows": 1,
+  "fps": 8,
+  "loop": true
+}

@@ -3,6 +3,7 @@ using catgirlwindow.Src.Agent;
 using catgirlwindow.Src.Core.Config;
 using catgirlwindow.Src.Core.Events;
 using catgirlwindow.Src.Models;
+using catgirlwindow.Src.Renderer;
 using catgirlwindow.Src.Services.Tool;
 using catgirlwindow.Src.Services;
 
@@ -14,6 +15,7 @@ namespace catgirlwindow.Src.UI
         private IAgent _agent;
         private IEventDispatcher _eventDispatcher;
         private bool _isInitializing = true;
+        private CharacterRenderer _characterRenderer = new();
 
         public Form1()
         {
@@ -58,9 +60,76 @@ namespace catgirlwindow.Src.UI
             _eventDispatcher.Subscribe(EventCategory.ToolResult, OnAgentReply);
 
             InitializeProviders();
+
+            // 初始化角色渲染器
+            InitializeCharacterRenderer();
         }
 
-        /// <summary>Agent 情绪变化回调（更新 UI）</summary>
+        /// <summary>
+        /// 初始化角色渲染器
+        /// </summary>
+        private async void InitializeCharacterRenderer()
+        {
+            try
+            {
+                var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                var imagesPath = Path.Combine(baseDir, "Resources", "Images");
+                if (!Directory.Exists(imagesPath))
+                {
+                    // 尝试从项目根目录查找
+                    var rootDir = AppDomain.CurrentDomain.BaseDirectory;
+                    for (int i = 0; i < 5; i++)
+                    {
+                        var parent = Directory.GetParent(rootDir);
+                        if (parent == null) break;
+                        rootDir = parent.FullName;
+                        if (File.Exists(Path.Combine(rootDir, "catgirlwindow.sln")))
+                            break;
+                    }
+                    imagesPath = Path.Combine(rootDir, "Resources", "Images");
+                }
+
+                await _characterRenderer.InitializeAsync(imagesPath);
+                _characterRenderer.FrameUpdated += OnCharacterFrameUpdated;
+
+                // 启动渲染定时器
+                renderTimer.Start();
+            }
+            catch (Exception ex)
+            {
+                AppendChat("渲染器", $"角色初始化失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 角色帧更新回调 - 刷新 PictureBox
+        /// </summary>
+        private void OnCharacterFrameUpdated()
+        {
+            if (InvokeRequired)
+            {
+                Invoke(OnCharacterFrameUpdated);
+                return;
+            }
+
+            var frame = _characterRenderer.CurrentFrame;
+            if (frame != null)
+            {
+                pictureBoxCharacter.Image?.Dispose();
+                pictureBoxCharacter.Image = (Image)frame.Clone();
+            }
+        }
+
+        /// <summary>
+        /// 渲染定时器 Tick - 用于帧同步
+        /// </summary>
+        private void renderTimer_Tick(object? sender, EventArgs e)
+        {
+            // 定时器仅用于驱动 PictureBox 刷新
+            // 实际帧更新由 CharacterRenderer 的 FrameUpdated 事件驱动
+        }
+
+        /// <summary>Agent 情绪变化回调（更新 UI 和角色动画）</summary>
         private void OnAgentMoodChanged(object? sender, AgentMood mood)
         {
             if (InvokeRequired)
@@ -82,6 +151,12 @@ namespace catgirlwindow.Src.UI
                 _ => "😐 平静"
             };
             Text = $"猫娘窗口 - {moodName}";
+
+            // 同步更新角色动画
+            if (_characterRenderer.IsInitialized)
+            {
+                _characterRenderer.SetMotion(mood);
+            }
         }
 
         /// <summary>Agent 回复事件回调（显示回复内容）</summary>

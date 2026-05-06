@@ -17,6 +17,8 @@ partial class Form1
     private System.Windows.Forms.TextBox textBoxPrompt;
     private System.Windows.Forms.Button buttonSend;
     private System.Windows.Forms.Button buttonClear;
+    private System.Windows.Forms.PictureBox pictureBoxCharacter;
+    private System.Windows.Forms.Timer renderTimer;
 
     /// <summary>
     ///  Clean up any resources being used.
@@ -49,7 +51,10 @@ partial class Form1
         this.labelPrompt = new System.Windows.Forms.Label();
         this.textBoxPrompt = new System.Windows.Forms.TextBox();
         this.buttonSend = new System.Windows.Forms.Button();
+        this.pictureBoxCharacter = new System.Windows.Forms.PictureBox();
+        this.renderTimer = new System.Windows.Forms.Timer();
         this.buttonClear = new System.Windows.Forms.Button();
+        ((System.ComponentModel.ISupportInitialize)(this.pictureBoxCharacter)).BeginInit();
         this.SuspendLayout();
         // 
         // labelUrl
@@ -142,6 +147,21 @@ partial class Form1
         this.buttonSend.UseVisualStyleBackColor = true;
         this.buttonSend.Click += new System.EventHandler(this.buttonSend_Click);
         // 
+        // pictureBoxCharacter
+        // 
+        this.pictureBoxCharacter.BackColor = System.Drawing.Color.Transparent;
+        this.pictureBoxCharacter.Location = new System.Drawing.Point(800, 12);
+        this.pictureBoxCharacter.Name = "pictureBoxCharacter";
+        this.pictureBoxCharacter.Size = new System.Drawing.Size(512, 689);
+        this.pictureBoxCharacter.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
+        this.pictureBoxCharacter.TabIndex = 11;
+        this.pictureBoxCharacter.TabStop = false;
+        // 
+        // renderTimer
+        // 
+        this.renderTimer.Interval = 50;
+        this.renderTimer.Tick += new System.EventHandler(this.renderTimer_Tick);
+        // 
         // buttonClear
         // 
         this.buttonClear.Location = new System.Drawing.Point(648, 357);
@@ -155,7 +175,8 @@ partial class Form1
         // Form1
         // 
         this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-        this.ClientSize = new System.Drawing.Size(800, 450);
+        this.ClientSize = new System.Drawing.Size(1324, 713);
+        this.Controls.Add(this.pictureBoxCharacter);
         this.Controls.Add(this.buttonClear);
         this.Controls.Add(this.buttonSend);
         this.Controls.Add(this.textBoxPrompt);
@@ -168,7 +189,8 @@ partial class Form1
         this.Controls.Add(this.textBoxUrl);
         this.Controls.Add(this.labelUrl);
         this.Name = "Form1";
-        this.Text = "LLM 对话窗口";
+        this.Text = "猫娘窗口";
+        ((System.ComponentModel.ISupportInitialize)(this.pictureBoxCharacter)).EndInit();
         this.ResumeLayout(false);
         this.PerformLayout();
     }

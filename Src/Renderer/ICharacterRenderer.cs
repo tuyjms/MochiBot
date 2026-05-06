@@ -1,6 +1,6 @@
 using catgirlwindow.Src.Models;
 
-namespace catgirlwindow.SrcRenderer
+namespace catgirlwindow.Src.Renderer
 {
     /// <summary>
     /// 角色动画渲染器接口
