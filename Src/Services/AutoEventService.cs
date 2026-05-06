@@ -1,13 +1,18 @@
+using System.Text.Json;
 using System.Timers;
+using catgirlwindow.Src.Core.Events;
+using catgirlwindow.Src.Models;
 using Timer = System.Timers.Timer;
 
 namespace catgirlwindow.Src.Services
 {
     /// <summary>
     /// 自动事件服务 - 通用定时任务调度器 + 三个内置特殊事件
+    /// 通过事件调度器发布事件，不再直接触发 OnTaskTriggered
     /// </summary>
     public class AutoEventService : IAutoEventService, IDisposable
     {
+        private readonly IEventDispatcher _eventDispatcher;
         private Timer? _mainTimer;
         private bool _isRunning;
         private int _tickCount;
@@ -41,6 +46,11 @@ namespace catgirlwindow.Src.Services
         public TimeSpan LateNightBaseTime => new(LateNightBaseHour, LateNightBaseMinute, 0);
 
         public event EventHandler<CronTask>? OnTaskTriggered;
+
+        public AutoEventService(IEventDispatcher eventDispatcher)
+        {
+            _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
+        }
 
         public void Start()
         {
@@ -203,13 +213,11 @@ namespace catgirlwindow.Src.Services
             var roll = _random.Next(100);
             if (roll < _murmurWeight)
             {
-                OnTaskTriggered?.Invoke(this, new CronTask
+                _eventDispatcher.Publish(new EventData
                 {
-                    Id = "builtin:murmur",
-                    Name = "碎碎念",
-                    TaskType = "murmur",
-                    CronExpression = "* * * * *",
-                    Enabled = true
+                    Category = EventCategory.SystemAuto,
+                    Trigger = EventTrigger.System,
+                    Info = JsonSerializer.Serialize(new { type = "murmur", name = "碎碎念" })
                 });
             }
         }
@@ -225,14 +233,11 @@ namespace catgirlwindow.Src.Services
             {
                 _eyeRestFired = true;
                 var hours = (int)elapsed.TotalHours;
-                OnTaskTriggered?.Invoke(this, new CronTask
+                _eventDispatcher.Publish(new EventData
                 {
-                    Id = "builtin:eye_rest",
-                    Name = "用眼提醒",
-                    TaskType = "eye_rest",
-                    CronExpression = "* * * * *",
-                    Parameters = hours.ToString(),
-                    Enabled = true
+                    Category = EventCategory.SystemAuto,
+                    Trigger = EventTrigger.System,
+                    Info = JsonSerializer.Serialize(new { type = "eye_rest", hours, name = "用眼提醒" })
                 });
             }
         }
@@ -250,13 +255,11 @@ namespace catgirlwindow.Src.Services
 
             if (diff >= 0 && diff < 2) // 1秒误差窗口
             {
-                OnTaskTriggered?.Invoke(this, new CronTask
+                _eventDispatcher.Publish(new EventData
                 {
-                    Id = "builtin:late_night",
-                    Name = "深夜关怀",
-                    TaskType = "late_night",
-                    CronExpression = "* * * * *",
-                    Enabled = true
+                    Category = EventCategory.SystemAuto,
+                    Trigger = EventTrigger.System,
+                    Info = JsonSerializer.Serialize(new { type = "late_night", name = "深夜关怀" })
                 });
             }
         }

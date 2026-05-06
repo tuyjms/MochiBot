@@ -1,6 +1,7 @@
 using System.Text.Json;
 using catgirlwindow.Src.Agent;
 using catgirlwindow.Src.Core.Config;
+using catgirlwindow.Src.Core.Events;
 using catgirlwindow.Src.Models;
 using catgirlwindow.Src.Services;
 
@@ -30,8 +31,15 @@ namespace catgirlwindow.SrcUI
             // 保存短期记忆引用，用于提供商切换时保留对话历史
             _shortTermMemory = shortTermMemory;
 
-            // 创建 Agent（心情记录器已集成到 Agent 内部）
+            // 创建事件调度器
+            var eventDispatcher = new EventDispatcher();
+
+            // 创建自动事件服务（通过事件调度器发布事件）
+            var autoEventService = new AutoEventService(eventDispatcher);
+
+            // 创建 Agent（心情记录器已集成到 Agent 内部，通过事件调度器接收事件）
             _agent = new MainAgent(
+                eventDispatcher,
                 _llmClient,
                 configReader,
                 formatter,

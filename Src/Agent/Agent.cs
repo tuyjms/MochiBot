@@ -2,6 +2,7 @@ using System.Text.Json;
 using catgirlwindow.Src.Core.Config;
 using catgirlwindow.Src.Core.Config.Models;
 using catgirlwindow.Src.Core.Database;
+using catgirlwindow.Src.Core.Events;
 using catgirlwindow.Src.Models;
 using catgirlwindow.Src.Services;
 using OpenAiChatMessage = OpenAI.Chat.ChatMessage;
@@ -13,11 +14,11 @@ namespace catgirlwindow.Src.Agent
 {
     /// <summary>
     /// Agent 核心协调层实现
-    /// 作为 LLM 与平台交互的唯一入口，协调所有子模块
-    /// 心情记录器已集成到 Agent 内部，不再作为外部依赖
+    /// 通过事件调度器接收事件，不再直接接收方法调用
     /// </summary>
     public class MainAgent : IAgent
     {
+        private readonly IEventDispatcher _eventDispatcher;
         private readonly LlmClient _llmClient;
         private readonly IConfigReader _configReader;
         private readonly IShortTermMemory _shortTermMemory;
@@ -30,6 +31,9 @@ namespace catgirlwindow.Src.Agent
 #pragma warning disable CS0169
         private readonly IPromptFormatter _formatter;
 #pragma warning restore CS0169
+
+        // 事件订阅ID
+        private readonly List<string> _subscriptionIds = new();
 
         // ========== 心情记录器（集成到 Agent 内部） ==========
         private AgentMood _currentMood = AgentMood.Neutral;
@@ -66,6 +70,7 @@ namespace catgirlwindow.Src.Agent
 ";
 
         public MainAgent(
+            IEventDispatcher eventDispatcher,
             LlmClient llmClient,
             IConfigReader configReader,
             IPromptFormatter formatter,
@@ -73,6 +78,7 @@ namespace catgirlwindow.Src.Agent
             IToolService toolService,
             IDatabaseService? databaseService = null)
         {
+            _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
             _llmClient = llmClient ?? throw new ArgumentNullException(nameof(llmClient));
             _configReader = configReader ?? throw new ArgumentNullException(nameof(configReader));
             _formatter = formatter ?? throw new ArgumentNullException(nameof(formatter));
@@ -82,6 +88,57 @@ namespace catgirlwindow.Src.Agent
 
             _appSettings = configReader.GetAppSettings();
             _personality = configReader.GetActivePersonality();
+
+            // 订阅事件调度器
+            SubscribeToEvents();
+        }
+
+        /// <summary>订阅事件调度器的事件</summary>
+        private void SubscribeToEvents()
+        {
+            // 订阅系统自动事件（碎碎念、用眼提醒、深夜关怀）
+            var sysSubId = _eventDispatcher.Subscribe(EventCategory.SystemAuto, async (eventData) =>
+            {
+                try
+                {
+                    string? eventType = null;
+                    string? eventInfo = null;
+                    using (var doc = JsonDocument.Parse(eventData.Info))
+                    {
+                        if (doc.RootElement.TryGetProperty("type", out var typeProp))
+                            eventType = typeProp.GetString();
+                        if (doc.RootElement.TryGetProperty("hours", out var hoursProp))
+                            eventInfo = hoursProp.GetInt32().ToString();
+                    }
+
+                    if (!string.IsNullOrEmpty(eventType))
+                    {
+                        await ProcessAutoEventAsync(eventType, eventInfo);
+                    }
+                }
+                catch { }
+            });
+            _subscriptionIds.Add(sysSubId);
+
+            // 订阅 UI 交互事件（摸摸、点击等）
+            var uiSubId = _eventDispatcher.Subscribe(EventCategory.UiInteraction, (eventData) =>
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(eventData.Info);
+                    if (doc.RootElement.TryGetProperty("type", out var typeProp))
+                    {
+                        var uiType = typeProp.GetString();
+                        if (uiType == "pet")
+                        {
+                            _lastEvent = "Pet";
+                            UpdateMoodByEvent("Pet");
+                        }
+                    }
+                }
+                catch { }
+            });
+            _subscriptionIds.Add(uiSubId);
         }
 
         // ========== 心情记录器方法（集成到 Agent 内部） ==========
