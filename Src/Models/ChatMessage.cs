@@ -1,4 +1,4 @@
-namespace catgirlwindow.Src.Core.Models
+namespace catgirlwindow.Src.Models
 {
     /// <summary>
     /// 对话消息模型

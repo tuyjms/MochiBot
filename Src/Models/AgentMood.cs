@@ -1,4 +1,4 @@
-namespace catgirlwindow.Src.Core.Models
+namespace catgirlwindow.Src.Models
 {
     /// <summary>
     /// AI女友情绪状态枚举

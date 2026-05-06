@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using catgirlwindow.Src.Core.Models;
+using catgirlwindow.Src.Models;
 
 namespace catgirlwindow.Src.Core.Database
 {

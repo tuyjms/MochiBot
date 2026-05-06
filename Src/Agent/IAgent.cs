@@ -1,3 +1,5 @@
+using catgirlwindow.Src.Models;
+
 namespace catgirlwindow.Src.Agent
 {
     /// <summary>
@@ -16,9 +18,27 @@ namespace catgirlwindow.Src.Agent
     /// <summary>
     /// Agent 核心协调层接口
     /// 作为 LLM 与平台交互的唯一入口
+    /// 心情记录器已集成到 Agent 内部
     /// </summary>
     public interface IAgent
     {
+        // ========== 心情记录器（集成到 Agent 内部） ==========
+
+        /// <summary>获取当前情绪</summary>
+        AgentMood CurrentMood { get; }
+
+        /// <summary>情绪变化时触发的事件（UI订阅以更新头像）</summary>
+        event EventHandler<AgentMood>? MoodChanged;
+
+        /// <summary>手动设置情绪（外部触发，如摸摸她）</summary>
+        void SetMood(AgentMood mood);
+
+        /// <summary>根据系统事件自动切换情绪</summary>
+        void UpdateMoodByEvent(string eventType);
+
+        /// <summary>获取当前情绪对应的表情图片路径</summary>
+        string GetMoodImagePath();
+
         // ========== 对话模式（LLM扮演女友） ==========
 
         /// <summary>处理用户输入消息</summary>
@@ -31,7 +51,6 @@ namespace catgirlwindow.Src.Agent
         /// <param name="eventData">事件附带数据（可选）</param>
         /// <returns>AI生成的回复内容</returns>
         Task<string> ProcessAutoEventAsync(string eventType, string? eventData = null);
-
 
         // ========== 函数模式（LLM作为纯函数） ==========
 
@@ -49,7 +68,6 @@ namespace catgirlwindow.Src.Agent
         /// <param name="content">需要评估的内容</param>
         /// <returns>重要度分数</returns>
         Task<int> EvaluateImportanceAsync(string content);
-
 
         // ========== 工具/插件/MCP调用 ==========
 
@@ -71,7 +89,6 @@ namespace catgirlwindow.Src.Agent
         /// <param name="parameters">工具参数（JSON格式）</param>
         /// <returns>MCP工具执行结果</returns>
         Task<string> ProcessMcpCallAsync(string serverName, string toolName, string parameters);
-
 
         // ========== 状态查询 ==========
 

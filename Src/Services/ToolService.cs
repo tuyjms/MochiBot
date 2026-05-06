@@ -1,17 +1,18 @@
 using System.Text.Json;
 using catgirlwindow.Src.Agent;
 using catgirlwindow.Src.Core.Models;
+using catgirlwindow.Src.Models;
 using Timer = System.Threading.Timer;
 
 namespace catgirlwindow.Src.Services
 {
     /// <summary>
     /// 工具功能服务实现
+    /// 不依赖 IAgentMoodTracker，情绪变化通过 LLM 的 mood_change action 走统一事件调度
     /// </summary>
     public class ToolService : IToolService, IDisposable
     {
         private readonly LlmClient _llmClient;
-        private readonly IAgentMoodTracker _moodTracker;
         private readonly IPromptFormatter _formatter;
         private readonly Random _random = new();
 
@@ -48,44 +49,44 @@ namespace catgirlwindow.Src.Services
         };
 
         // 心情附加工具
+        // 注意：描述以 LLM 为主语（调用方是 LLM），描述 LLM 执行此工具后的效果
         private static readonly Dictionary<AgentMood, ToolDefinition> MoodTools = new()
         {
             [AgentMood.Sad] = new ToolDefinition
             {
-                Name = "hug",
-                Description = "拥抱AI女友，她会感到温暖和安慰（当前心情委屈时可用）",
+                Name = "cry",
+                Description = "播放哭泣动画，表达委屈难过的情绪（当前心情委屈时可用）",
                 InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
             },
             [AgentMood.Happy] = new ToolDefinition
             {
                 Name = "dance",
-                Description = "和AI女友一起跳舞，她会更开心（当前心情开心时可用）",
+                Description = "播放跳舞动画，表达开心愉悦的情绪（当前心情开心时可用）",
                 InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
             },
             [AgentMood.Sleepy] = new ToolDefinition
             {
-                Name = "tuck_in",
-                Description = "哄AI女友睡觉（当前心情困倦时可用）",
+                Name = "yawn",
+                Description = "播放打哈欠动画，表达困倦想睡的情绪（当前心情困倦时可用）",
                 InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
             },
             [AgentMood.Touched] = new ToolDefinition
             {
-                Name = "cuddle",
-                Description = "和感动的AI女友依偎在一起（当前心情感动时可用）",
+                Name = "blush",
+                Description = "播放脸红动画，表达害羞感动的情绪（当前心情感动时可用）",
                 InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
             },
             [AgentMood.Angry] = new ToolDefinition
             {
-                Name = "calm_down",
-                Description = "安抚生气的AI女友（当前心情生气时可用）",
+                Name = "stomp",
+                Description = "播放跺脚动画，表达生气不满的情绪（当前心情生气时可用）",
                 InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
             }
         };
 
-        public ToolService(LlmClient llmClient, IAgentMoodTracker moodTracker, IPromptFormatter formatter)
+        public ToolService(LlmClient llmClient, IPromptFormatter formatter)
         {
             _llmClient = llmClient ?? throw new ArgumentNullException(nameof(llmClient));
-            _moodTracker = moodTracker ?? throw new ArgumentNullException(nameof(moodTracker));
             _formatter = formatter ?? throw new ArgumentNullException(nameof(formatter));
         }
 
@@ -172,11 +173,11 @@ actions 数组中每个元素的 type 可以是：
                     "pet" => await ExecutePetAsync(),
                     "weather" => await ExecuteWeatherAsync(parameters),
                     "list_plugins" => await ExecuteListPluginsAsync(),
-                    "hug" => await ExecuteHugAsync(),
+                    "cry" => await ExecuteCryAsync(),
                     "dance" => await ExecuteDanceAsync(),
-                    "tuck_in" => await ExecuteTuckInAsync(),
-                    "cuddle" => await ExecuteCuddleAsync(),
-                    "calm_down" => await ExecuteCalmDownAsync(),
+                    "yawn" => await ExecuteYawnAsync(),
+                    "blush" => await ExecuteBlushAsync(),
+                    "stomp" => await ExecuteStompAsync(),
                     _ => new ToolResult { Success = false, Error = $"未知工具: {toolName}" }
                 };
             }
@@ -203,7 +204,7 @@ actions 数组中每个元素的 type 可以是：
         private async Task<ToolResult> ExecutePetAsync()
         {
             var response = await PetAsync();
-            return new ToolResult { Success = true, Data = JsonSerializer.Serialize(new { response, mood = "Touched" }) };
+            return new ToolResult { Success = true, Data = JsonSerializer.Serialize(new { response }) };
         }
 
         private async Task<ToolResult> ExecuteWeatherAsync(string parameters)
@@ -220,11 +221,12 @@ actions 数组中每个元素的 type 可以是：
             return new ToolResult { Success = true, Data = JsonSerializer.Serialize(new { plugins = new List<object>(), mcp_tools = new List<object>() }) };
         }
 
-        private Task<ToolResult> ExecuteHugAsync() { _moodTracker.SetMood(AgentMood.Touched); return Task.FromResult(new ToolResult { Success = true, Data = "{\"response\":\"被抱抱了好温暖…谢谢你～\",\"mood\":\"Touched\"}" }); }
-        private Task<ToolResult> ExecuteDanceAsync() { _moodTracker.SetMood(AgentMood.Happy); return Task.FromResult(new ToolResult { Success = true, Data = "{\"response\":\"好呀好呀，一起跳舞吧～♪\",\"mood\":\"Happy\"}" }); }
-        private Task<ToolResult> ExecuteTuckInAsync() { _moodTracker.SetMood(AgentMood.Sleepy); return Task.FromResult(new ToolResult { Success = true, Data = "{\"response\":\"唔…被盖好被子了，好暖和…晚安～\",\"mood\":\"Sleepy\"}" }); }
-        private Task<ToolResult> ExecuteCuddleAsync() { _moodTracker.SetMood(AgentMood.Touched); return Task.FromResult(new ToolResult { Success = true, Data = "{\"response\":\"就这样依偎着…好幸福～\",\"mood\":\"Touched\"}" }); }
-        private Task<ToolResult> ExecuteCalmDownAsync() { _moodTracker.SetMood(AgentMood.Neutral); return Task.FromResult(new ToolResult { Success = true, Data = "{\"response\":\"嗯…被你安抚了，我不生气了～\",\"mood\":\"Neutral\"}" }); }
+        // 心情附加工具：只播放动画，不涉及情绪变化
+        private Task<ToolResult> ExecuteCryAsync() { return Task.FromResult(new ToolResult { Success = true, Data = "{\"animation\":\"cry\"}" }); }
+        private Task<ToolResult> ExecuteDanceAsync() { return Task.FromResult(new ToolResult { Success = true, Data = "{\"animation\":\"dance\"}" }); }
+        private Task<ToolResult> ExecuteYawnAsync() { return Task.FromResult(new ToolResult { Success = true, Data = "{\"animation\":\"yawn\"}" }); }
+        private Task<ToolResult> ExecuteBlushAsync() { return Task.FromResult(new ToolResult { Success = true, Data = "{\"animation\":\"blush\"}" }); }
+        private Task<ToolResult> ExecuteStompAsync() { return Task.FromResult(new ToolResult { Success = true, Data = "{\"animation\":\"stomp\"}" }); }
 
         public Task StartTimerAsync(int seconds, Action onComplete)
         {
@@ -308,7 +310,7 @@ actions 数组中每个元素的 type 可以是：
 
         public Task<string> PetAsync()
         {
-            _moodTracker.SetMood(AgentMood.Touched);
+            // 情绪变化由 LLM 的 mood_change action 处理，这里只返回摸头回应文本
             return Task.FromResult(PetResponses[_random.Next(PetResponses.Length)]);
         }
 

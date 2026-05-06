@@ -7,6 +7,7 @@ Agent 是系统的**大脑**和**中枢神经**，负责协调所有子模块。
 ### 两种 LLM 调用模式
 
 | 模式 | 场景 | 说明 |
+|------|------|------|
 | **对话模式** | 用户聊天、自动事件（碎碎念/关怀） | LLM 扮演"AI女友"角色，通过结构化响应控制工具/记忆/情绪 |
 | **函数模式** | 记忆总结、关键词提取、重要度评估 | LLM 被当作纯函数调用，直接调用 LlmClient，不走人格层，保证稳定性 |
 
@@ -15,13 +16,28 @@ Agent 是系统的**大脑**和**中枢神经**，负责协调所有子模块。
 ```csharp
 public interface IAgent
 {
+    // ========== 心情记录器（集成到 Agent 内部） ==========
+
+    /// <summary>当前情绪</summary>
+    AgentMood CurrentMood { get; }
+
+    /// <summary>情绪变化时触发的事件（UI订阅以更新头像）</summary>
+    event EventHandler<AgentMood>? MoodChanged;
+
+    /// <summary>手动设置情绪（外部触发，如摸摸她）</summary>
+    void SetMood(AgentMood mood);
+
+    /// <summary>根据系统事件自动切换情绪</summary>
+    void UpdateMoodByEvent(string eventType);
+
+    /// <summary>获取当前情绪对应的表情图片路径</summary>
+    string GetMoodImagePath();
+
+
     // ========== 事件处理（由事件调度器触发） ==========
 
     /// <summary>处理用户消息事件</summary>
-    Task<string> ProcessUserMessageAsync(string message);
-
-    /// <summary>处理用户交互事件（摸摸、抱抱等）</summary>
-    Task<string> ProcessUserInteractionAsync(string interactionType, string? data = null);
+    Task<string> ProcessUserInputAsync(string message);
 
     /// <summary>处理系统自动事件（碎碎念、用眼提醒、深夜关怀）</summary>
     Task<string> ProcessAutoEventAsync(string eventType, string? eventData = null);
@@ -39,6 +55,18 @@ public interface IAgent
     Task<int> EvaluateImportanceAsync(string content);
 
 
+    // ========== 工具/插件/MCP调用 ==========
+
+    /// <summary>执行工具调用</summary>
+    Task<string> ProcessToolCallAsync(string toolName, string parameters);
+
+    /// <summary>执行JS插件调用</summary>
+    Task<string> ProcessPluginCallAsync(string pluginName, string parameters);
+
+    /// <summary>执行MCP服务器工具调用</summary>
+    Task<string> ProcessMcpCallAsync(string serverName, string toolName, string parameters);
+
+
     // ========== 状态查询 ==========
 
     /// <summary>获取当前Agent状态摘要</summary>
@@ -49,7 +77,8 @@ public class AgentStatus
 {
     public string CurrentMood { get; set; } = string.Empty;
     public int ShortTermMemoryCount { get; set; }
-    public int LongMemoryCount { get; set; }
+    public int MidTermMemoryCount { get; set; }
+    public int LongTermMemoryCount { get; set; }
     public bool IsProcessing { get; set; }
     public string LastEvent { get; set; } = string.Empty;
 }
@@ -57,16 +86,42 @@ public class AgentStatus
 
 ## 集成到Agent的模块
 
-### 心情记录器 (AgentMoodTracker)
+### 心情记录器（已内联到 Agent）
 
-心情记录器已集成到 Agent 中，不再作为独立服务。Agent 直接管理情绪状态：
+心情记录器已完全集成到 Agent 中，不再作为独立服务或外部依赖。Agent 直接管理情绪状态：
 
 ```csharp
-// Agent 内部管理情绪
-private readonly IAgentMoodTracker _moodTracker;
+// Agent 内部直接管理情绪
+private AgentMood _currentMood = AgentMood.Neutral;
+public event EventHandler<AgentMood>? MoodChanged;
 
-// 情绪变化事件
-_moodTracker.MoodChanged += OnMoodChanged;
+// 设置情绪
+public void SetMood(AgentMood mood)
+{
+    if (_currentMood == mood) return;
+    _currentMood = mood;
+    MoodChanged?.Invoke(this, mood);
+    // 记录到数据库
+    if (_databaseService != null)
+        _ = _databaseService.LogMoodChangeAsync(mood, _lastEvent);
+}
+
+// 根据事件切换情绪
+public void UpdateMoodByEvent(string eventType)
+{
+    var newMood = eventType switch
+    {
+        "LateNight" or "Sleepy" => AgentMood.Sleepy,
+        "LongWork" => AgentMood.Neutral,
+        "Idle" => AgentMood.Sad,
+        "Active" => AgentMood.Neutral,
+        "Pet" => AgentMood.Touched,
+        "Compliment" => AgentMood.Happy,
+        "Angry" => AgentMood.Angry,
+        _ => _currentMood
+    };
+    SetMood(newMood);
+}
 ```
 
 情绪切换规则：
@@ -75,11 +130,13 @@ _moodTracker.MoodChanged += OnMoodChanged;
 |---------|-----------|------|
 | 用户长时间未交互（>30min） | Sad | 感到委屈 |
 | 深夜时段（23:00-06:00） | Sleepy | 困倦状态 |
-| 用户点击"摸摸她" | Touched | 被摸头感动 |
-| 用户夸奖 | Happy | 被夸奖开心 |
-| 毒舌性格下互动 | Teasing | 调皮状态 |
-| 用户频繁发送消息 | Angry | 被烦到 |
+| 用户消息含"摸摸""摸头""抱抱"等关键词 | Touched | 被摸头感动 |
+| 用户消息含"夸""好看""可爱""喜欢你"等关键词 | Happy | 被夸奖开心 |
 | 默认状态 | Neutral | 平静 |
+
+情绪变化通过两种方式触发：
+1. **Agent 自动检测**：`ProcessUserInputAsync` 中根据用户消息关键词和时间自动调用 `UpdateMoodByEvent()`
+2. **LLM 主动切换**：LLM 在 actions 中返回 `mood_change` action，`ExecuteActionsAsync` 解析后调用 `SetMood()`
 
 ### 短期记忆 (ShortTermMemory)
 
@@ -120,7 +177,7 @@ Agent 使用 PromptFormatter 构建各类 prompt，工具描述按三层结构�
 var baseTools = _toolManager.GetToolDefinitions();
 
 // 第二层：心情附加工具（根据当前情绪动态注入）
-var moodTools = _toolManager.GetMoodBasedTools(_moodTracker.CurrentMood);
+var moodTools = _toolManager.GetMoodBasedTools(_currentMood);
 
 // 第三层：插件/MCP工具（通过 list_plugins 间接获取）
 // LLM 需要先调用 list_plugins 获取列表
@@ -149,10 +206,10 @@ var moodTools = _toolManager.GetMoodBasedTools(_moodTracker.CurrentMood);
 3. 构建完整 Prompt（含长期记忆检索）
 4. LlmClient.SendChatAsync() 对话模式调用
 5. 解析 LLM 响应：提取 reply 文本 + 解析 actions 数组
-6. 遍历执行 actions：tool_call → ToolManager、mood_change → AgentMoodTracker、animation → Renderer
+6. 遍历执行 actions：tool_call → ToolManager、mood_change → SetMood()、animation → Renderer
 7. 短期记忆.AddMessage("assistant", reply)
 8. 检查短期记忆是否溢出，溢出时调用函数模式评估重要度后录入 LongMemory
-9. AgentMoodTracker.UpdateMoodByEvent("Active")
+9. 根据用户消息关键词和时间自动检测情绪变化（DetectAndTriggerMoodEvent）
 10. 返回 reply
 
 ### 2. 处理自动事件（对话模式）
@@ -173,7 +230,9 @@ var moodTools = _toolManager.GetMoodBasedTools(_moodTracker.CurrentMood);
 
 ## 依赖关系
 
-Agent 依赖：LlmClient, PromptFormatter, ShortTermMemory, LongMemory, ToolManager, AgentMoodTracker, ICharacterRenderer, IDatabaseService
+Agent 依赖：LlmClient, PromptFormatter, ShortTermMemory, ToolManager, ICharacterRenderer, IDatabaseService
+
+**不依赖**：IAgentMoodTracker（已内联到 Agent 内部）
 
 依赖 Agent：Form1（UI层）, AutoEventService
 
@@ -191,6 +250,7 @@ Agent 核心协调层**不需要编写单元测试**。原因如下：
 ## 配置参数
 
 | 参数 | 默认值 | 说明 |
+|------|--------|------|
 | EnableStructuredResponse | true | 是否启用LLM结构化响应解析 |
 | MaxActionsPerResponse | 5 | 单次LLM响应最大执行动作数 |
 | EnableLongTermRecall | true | 对话时是否检索长期记忆注入上下文 |

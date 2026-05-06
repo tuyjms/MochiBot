@@ -1,6 +1,7 @@
 using System.Text.Json;
 using catgirlwindow.Src.Agent;
 using catgirlwindow.Src.Core.Config;
+using catgirlwindow.Src.Models;
 using catgirlwindow.Src.Services;
 
 namespace catgirlwindow.SrcUI
@@ -21,23 +22,50 @@ namespace catgirlwindow.SrcUI
             ConfigReader.Initialize(Path.Combine(baseDir, "Resources", "appsettings.json"));
             var configReader = ConfigReader.Instance;
             var shortTermMemory = new ShortTermMemory(50);
-            var moodTracker = new AgentMoodTracker();
             var formatter = new PromptFormatter("");
-            var toolService = new ToolService(_llmClient, moodTracker, formatter);
+
+            // ToolService 不再依赖 IAgentMoodTracker，情绪变化通过 LLM 的 mood_change action 处理
+            var toolService = new ToolService(_llmClient, formatter);
 
             // 保存短期记忆引用，用于提供商切换时保留对话历史
             _shortTermMemory = shortTermMemory;
 
-            // 创建 Agent（不传中期/长期记忆）
+            // 创建 Agent（心情记录器已集成到 Agent 内部）
             _agent = new MainAgent(
                 _llmClient,
                 configReader,
                 formatter,
                 shortTermMemory,
-                toolService,
-                moodTracker);
+                toolService);
+
+            // 订阅 Agent 的情绪变化事件（用于更新 UI）
+            _agent.MoodChanged += OnAgentMoodChanged;
 
             InitializeProviders();
+        }
+
+        /// <summary>Agent 情绪变化回调（更新 UI）</summary>
+        private void OnAgentMoodChanged(object? sender, AgentMood mood)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(() => OnAgentMoodChanged(sender, mood));
+                return;
+            }
+
+            // 更新窗口标题显示当前情绪
+            var moodName = mood switch
+            {
+                AgentMood.Happy => "😊 开心",
+                AgentMood.Sad => "😢 委屈",
+                AgentMood.Sleepy => "😴 困倦",
+                AgentMood.Touched => "🥰 感动",
+                AgentMood.Angry => "😠 生气",
+                AgentMood.Teasing => "😏 调皮",
+                AgentMood.Surprised => "😮 惊讶",
+                _ => "😐 平静"
+            };
+            Text = $"猫娘窗口 - {moodName}";
         }
 
         private void InitializeProviders()

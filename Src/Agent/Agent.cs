@@ -1,9 +1,8 @@
 using System.Text.Json;
-using catgirlwindow.Src.Agent;
 using catgirlwindow.Src.Core.Config;
 using catgirlwindow.Src.Core.Config.Models;
 using catgirlwindow.Src.Core.Database;
-using catgirlwindow.Src.Core.Models;
+using catgirlwindow.Src.Models;
 using catgirlwindow.Src.Services;
 using OpenAiChatMessage = OpenAI.Chat.ChatMessage;
 using OpenAiSystemChatMessage = OpenAI.Chat.SystemChatMessage;
@@ -15,15 +14,14 @@ namespace catgirlwindow.Src.Agent
     /// <summary>
     /// Agent 核心协调层实现
     /// 作为 LLM 与平台交互的唯一入口，协调所有子模块
+    /// 心情记录器已集成到 Agent 内部，不再作为外部依赖
     /// </summary>
     public class MainAgent : IAgent
     {
         private readonly LlmClient _llmClient;
         private readonly IConfigReader _configReader;
         private readonly IShortTermMemory _shortTermMemory;
-        private readonly IMidTermMemory? _midTermMemory;
         private readonly IToolService _toolService;
-        private readonly IAgentMoodTracker _moodTracker;
         private readonly IDatabaseService? _databaseService;
         private readonly AppSettings _appSettings;
         private readonly PersonalityConfig? _personality;
@@ -31,8 +29,12 @@ namespace catgirlwindow.Src.Agent
         // 预留依赖注入
 #pragma warning disable CS0169
         private readonly IPromptFormatter _formatter;
-        private readonly ILongTermMemory? _longTermMemory;
 #pragma warning restore CS0169
+
+        // ========== 心情记录器（集成到 Agent 内部） ==========
+        private AgentMood _currentMood = AgentMood.Neutral;
+        /// <summary>情绪变化时触发的事件（UI订阅以更新头像）</summary>
+        public event EventHandler<AgentMood>? MoodChanged;
 
         private bool _isProcessing;
         private string _lastEvent = string.Empty;
@@ -69,26 +71,68 @@ namespace catgirlwindow.Src.Agent
             IPromptFormatter formatter,
             IShortTermMemory shortTermMemory,
             IToolService toolService,
-            IAgentMoodTracker moodTracker,
-            IMidTermMemory? midTermMemory = null,
-            ILongTermMemory? longTermMemory = null,
             IDatabaseService? databaseService = null)
         {
             _llmClient = llmClient ?? throw new ArgumentNullException(nameof(llmClient));
             _configReader = configReader ?? throw new ArgumentNullException(nameof(configReader));
             _formatter = formatter ?? throw new ArgumentNullException(nameof(formatter));
             _shortTermMemory = shortTermMemory ?? throw new ArgumentNullException(nameof(shortTermMemory));
-            _midTermMemory = midTermMemory;
-            _longTermMemory = longTermMemory;
             _toolService = toolService ?? throw new ArgumentNullException(nameof(toolService));
-            _moodTracker = moodTracker ?? throw new ArgumentNullException(nameof(moodTracker));
             _databaseService = databaseService;
 
             _appSettings = configReader.GetAppSettings();
             _personality = configReader.GetActivePersonality();
+        }
 
-            // 订阅情绪变化事件，记录到数据库
-            _moodTracker.MoodChanged += OnMoodChanged;
+        // ========== 心情记录器方法（集成到 Agent 内部） ==========
+
+        /// <summary>获取当前情绪</summary>
+        public AgentMood CurrentMood => _currentMood;
+
+        /// <summary>手动设置情绪（外部触发，如摸摸她）</summary>
+        public void SetMood(AgentMood mood)
+        {
+            if (_currentMood == mood) return;
+            _currentMood = mood;
+            MoodChanged?.Invoke(this, mood);
+
+            // 记录到数据库
+            if (_databaseService != null)
+            {
+                _ = _databaseService.LogMoodChangeAsync(mood, _lastEvent);
+            }
+        }
+
+        /// <summary>根据系统事件自动切换情绪</summary>
+        public void UpdateMoodByEvent(string eventType)
+        {
+            var newMood = eventType switch
+            {
+                "LateNight" or "Sleepy" => AgentMood.Sleepy,
+                "LongWork" => AgentMood.Neutral,
+                "Idle" => AgentMood.Sad,
+                "Active" => AgentMood.Neutral,
+                "Pet" => AgentMood.Touched,
+                "Compliment" => AgentMood.Happy,
+                "Angry" => AgentMood.Angry,
+                _ => _currentMood
+            };
+
+            SetMood(newMood);
+        }
+
+        /// <summary>获取当前情绪对应的表情图片路径</summary>
+        public string GetMoodImagePath()
+        {
+            return _currentMood switch
+            {
+                AgentMood.Happy => "Resources/Images/happy.png",
+                AgentMood.Sad => "Resources/Images/sad.png",
+                AgentMood.Sleepy => "Resources/Images/sleepy.png",
+                AgentMood.Touched => "Resources/Images/touched.png",
+                AgentMood.Angry => "Resources/Images/angry.png",
+                _ => "Resources/Images/neutral.png"
+            };
         }
 
         // ========== 对话模式 ==========
@@ -134,10 +178,10 @@ namespace catgirlwindow.Src.Agent
                     _shortTermMemory.AddMessage("assistant", reply);
                 }
 
-                // 7. 检查短期记忆是否溢出
+                // 8. 检查短期记忆是否溢出
                 await CheckMemoryOverflowAsync();
 
-                // 8. 更新情绪（根据用户交互内容和时间自动判断）
+                // 9. 更新情绪（根据用户交互内容和时间自动判断）
                 DetectAndTriggerMoodEvent(userMessage);
 
                 return reply;
@@ -259,7 +303,7 @@ namespace catgirlwindow.Src.Agent
         {
             return new AgentStatus
             {
-                CurrentMood = _moodTracker.CurrentMood.ToString(),
+                CurrentMood = _currentMood.ToString(),
                 ShortTermMemoryCount = _shortTermMemory.Count,
                 MidTermMemoryCount = 0,
                 LongTermMemoryCount = 0,
@@ -275,8 +319,7 @@ namespace catgirlwindow.Src.Agent
         {
             var name = _personality?.Name ?? "小琪";
             var personalityDesc = _personality?.Description ?? "温柔可爱，善解人意";
-            var currentMood = _moodTracker.CurrentMood;
-            var moodDesc = GetMoodDescription(currentMood);
+            var moodDesc = GetMoodDescription(_currentMood);
 
             // 基础工具描述
             var baseTools = _toolService.GetToolDefinitions();
@@ -284,7 +327,7 @@ namespace catgirlwindow.Src.Agent
                 $"- {t.Name}: {t.Description} (参数: {JsonSerializer.Serialize(t.InputSchema)})"));
 
             // 心情附加工具描述
-            var moodTools = _toolService.GetMoodBasedTools(_moodTracker.CurrentMood);
+            var moodTools = _toolService.GetMoodBasedTools(_currentMood);
             var moodToolsDesc = string.Join("\n", moodTools.Select(t =>
                 $"- {t.Name}: {t.Description} (参数: {JsonSerializer.Serialize(t.InputSchema)})"));
 
@@ -293,7 +336,7 @@ namespace catgirlwindow.Src.Agent
             {
                 { "Name", name },
                 { "Personality", personalityDesc },
-                { "CurrentMood", $"{currentMood} - {moodDesc}" },
+                { "CurrentMood", $"{_currentMood} - {moodDesc}" },
                 { "BaseTools", baseToolsDesc },
                 { "MoodTools", moodToolsDesc }
             });
@@ -492,24 +535,12 @@ namespace catgirlwindow.Src.Agent
                         case "mood_change":
                             if (Enum.TryParse<AgentMood>(action.Mood, true, out var mood))
                             {
-                                _moodTracker.SetMood(mood);
+                                SetMood(mood);
                             }
                             break;
 
                         case "midterm_memory":
-                            if (_midTermMemory != null &&
-                                _appSettings.EnableMidTermMemoryOnChat &&
-                                !string.IsNullOrEmpty(action.Description))
-                            {
-                                var entry = new MidTermMemoryEntry
-                                {
-                                    Description = action.Description,
-                                    Importance = action.Importance,
-                                    Source = "LLM",
-                                    Timestamp = DateTime.Now
-                                };
-                                await _midTermMemory.AddEntryAsync(entry);
-                            }
+                            // 中期记忆已合并到长期记忆模块，暂不处理
                             break;
 
                         case "animation":
@@ -541,15 +572,10 @@ namespace catgirlwindow.Src.Agent
                     var summary = await SummarizeMemoryAsync(chatHistory);
                     var importance = await EvaluateImportanceAsync(summary);
 
-                    if (importance > 30 && _midTermMemory != null)
+                    if (importance > 30)
                     {
-                        await _midTermMemory.AddEntryAsync(new MidTermMemoryEntry
-                        {
-                            Description = summary,
-                            Importance = importance,
-                            Source = "Overflow",
-                            Timestamp = DateTime.Now
-                        });
+                        // 记录到短期记忆作为 system 消息
+                        _shortTermMemory.AddMessage("system", $"[记忆摘要] {summary}");
                     }
                 }
                 catch
@@ -624,28 +650,6 @@ namespace catgirlwindow.Src.Agent
             }
         }
 
-        /// <summary>简单关键词提取（用于长期记忆检索）</summary>
-#pragma warning disable CS0028
-        private static List<string> ExtractSimpleKeywords(string text)
-        {
-            var separators = new[] { ' ', '，', '。', '！', '？', '、', '；', '：', '\n', '\r', '\t' };
-            return text.Split(separators, StringSplitOptions.RemoveEmptyEntries)
-                .Where(w => w.Length >= 2)
-                .Distinct()
-                .Take(5)
-                .ToList();
-        }
-#pragma warning restore CS0028
-
-        /// <summary>情绪变化事件处理：记录到数据库</summary>
-        private void OnMoodChanged(object? sender, AgentMood mood)
-        {
-            if (_databaseService != null)
-            {
-                _ = _databaseService.LogMoodChangeAsync(mood, _lastEvent);
-            }
-        }
-
         /// <summary>根据用户消息内容和时间自动检测并触发情绪事件</summary>
         private void DetectAndTriggerMoodEvent(string userMessage)
         {
@@ -653,7 +657,7 @@ namespace catgirlwindow.Src.Agent
             if (hour >= 23 || hour < 6)
             {
                 _lastEvent = "LateNight";
-                _moodTracker.UpdateMoodByEvent("LateNight");
+                UpdateMoodByEvent("LateNight");
                 return;
             }
 
@@ -662,7 +666,7 @@ namespace catgirlwindow.Src.Agent
             if (msg.Contains("摸摸") || msg.Contains("摸头") || msg.Contains("拍头") || msg.Contains("抱抱"))
             {
                 _lastEvent = "Pet";
-                _moodTracker.UpdateMoodByEvent("Pet");
+                UpdateMoodByEvent("Pet");
                 return;
             }
 
@@ -670,12 +674,12 @@ namespace catgirlwindow.Src.Agent
                 msg.Contains("喜欢你") || msg.Contains("真棒") || msg.Contains("厉害"))
             {
                 _lastEvent = "Compliment";
-                _moodTracker.UpdateMoodByEvent("Compliment");
+                UpdateMoodByEvent("Compliment");
                 return;
             }
 
             _lastEvent = "Active";
-            _moodTracker.UpdateMoodByEvent("Active");
+            UpdateMoodByEvent("Active");
         }
 
         /// <summary>获取当前情绪的中文描述，用于注入 LLM 系统提示词</summary>
