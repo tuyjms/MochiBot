@@ -1,5 +1,7 @@
 using System.Text.Json;
 using catgirlwindow.Src.Agent;
+using catgirlwindow.Src.Core.Config;
+using catgirlwindow.Src.Core.Config.Models;
 using catgirlwindow.Src.Core.Models;
 using catgirlwindow.Src.Models;
 
@@ -14,22 +16,8 @@ namespace catgirlwindow.Src.Services.Tool
         private readonly LlmClient _llmClient;
         private readonly IPromptFormatter _formatter;
         private readonly IJsPluginLoader _pluginLoader;
+        private readonly IConfigReader _configReader;
         private readonly Random _random = new();
-
-        // 本地夸奖语
-        private static readonly string[] ComplimentTemplates =
-        {
-            "你今天的笑容特别好看，像阳光一样温暖～",
-            "你真的太棒了，每次和你聊天都很开心！",
-            "你知道吗？你认真做事的样子特别迷人～",
-            "有你在真好，你是我最重要的人！",
-            "你今天看起来特别精神，是不是有什么好事呀？",
-            "你总是能让我感到安心，谢谢你～",
-            "你的眼睛里有星星，特别好看！",
-            "和你在一起的每一刻都很幸福～",
-            "你真的很聪明，什么问题都难不倒你！",
-            "你是我见过最温柔的人～"
-        };
 
         // 摸摸她回应
         private static readonly string[] PetResponses =
@@ -76,10 +64,11 @@ namespace catgirlwindow.Src.Services.Tool
             }
         };
 
-        public ToolService(LlmClient llmClient, IPromptFormatter formatter, IJsPluginLoader? pluginLoader = null)
+        public ToolService(LlmClient llmClient, IPromptFormatter formatter, IConfigReader configReader, IJsPluginLoader? pluginLoader = null)
         {
             _llmClient = llmClient ?? throw new ArgumentNullException(nameof(llmClient));
             _formatter = formatter ?? throw new ArgumentNullException(nameof(formatter));
+            _configReader = configReader ?? throw new ArgumentNullException(nameof(configReader));
             _pluginLoader = pluginLoader ?? new JsPluginLoader();
         }
 
@@ -218,6 +207,7 @@ actions 数组中每个元素的 type 可以是：
             return toolName switch
             {
                 "timer" => await ExecuteTimerAsync(parameters),
+                "murmur" => await ExecuteMurmurAsync(),
                 "compliment" => await ExecuteComplimentAsync(),
                 "pet" => await ExecutePetAsync(),
                 "weather" => await ExecuteWeatherAsync(parameters),
@@ -242,9 +232,51 @@ actions 数组中每个元素的 type 可以是：
 
         private async Task<ToolResult> ExecuteTimerAsync(string parameters)
         {
-            using var doc = JsonDocument.Parse(parameters);
-            var seconds = doc.RootElement.GetProperty("seconds").GetInt32();
-            return new ToolResult { Success = true, Data = JsonSerializer.Serialize(new { message = $"已启动 {seconds} 秒倒计时", seconds, status = "running" }) };
+            try
+            {
+                using var doc = JsonDocument.Parse(parameters);
+                if (!doc.RootElement.TryGetProperty("seconds", out var secondsProp))
+                {
+                    return new ToolResult { Success = false, Error = "缺少 seconds 参数" };
+                }
+                var seconds = secondsProp.GetInt32();
+                
+                // 启动实际的倒计时（fire-and-forget）
+                _ = StartRealTimerAsync(seconds);
+                
+                return new ToolResult { Success = true, Data = JsonSerializer.Serialize(new { message = $"已启动 {seconds} 秒倒计时", seconds, status = "running" }) };
+            }
+            catch (JsonException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ToolService] timer 参数解析失败: {ex.Message}, parameters={parameters}");
+                return new ToolResult { Success = false, Error = $"timer 参数解析失败: {ex.Message}" };
+            }
+        }
+
+        private static async Task StartRealTimerAsync(int seconds)
+        {
+            try
+            {
+                await Task.Delay(seconds * 1000);
+                System.Diagnostics.Debug.WriteLine($"[ToolService] 倒计时结束！已过去 {seconds} 秒");
+                // 倒计时结束后的提醒逻辑由外部事件处理
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ToolService] 倒计时异常: {ex.Message}");
+            }
+        }
+
+        private Task<ToolResult> ExecuteMurmurAsync()
+        {
+            var settings = _configReader.GetModuleSettings();
+            var texts = settings.MurmurTexts;
+            if (texts == null || texts.Count == 0)
+            {
+                texts = new List<string> { "那个…你在忙吗？我、我只是想你了…" };
+            }
+            var text = texts[_random.Next(texts.Count)];
+            return Task.FromResult(new ToolResult { Success = true, Data = JsonSerializer.Serialize(new { murmur = text }) });
         }
 
         private async Task<ToolResult> ExecuteComplimentAsync()
@@ -304,7 +336,15 @@ actions 数组中每个元素的 type 可以是：
             {
                 System.Diagnostics.Debug.WriteLine("[ToolService] LLM夸奖失败，使用本地模板");
             }
-            return ComplimentTemplates[_random.Next(ComplimentTemplates.Length)];
+
+            // LLM 调用失败时，从配置读取 fallback 文本
+            var settings = _configReader.GetModuleSettings();
+            var texts = settings.ComplimentTemplates;
+            if (texts == null || texts.Count == 0)
+            {
+                texts = new List<string> { "你今天的笑容特别好看，像阳光一样温暖～" };
+            }
+            return texts[_random.Next(texts.Count)];
         }
 
         public Task<string> PetAsync()

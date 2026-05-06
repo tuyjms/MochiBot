@@ -2,7 +2,7 @@ using System.Text.Json;
 using catgirlwindow.Src.Core.Events;
 using catgirlwindow.Src.Models;
 
-namespace catgirlwindow.SrcTests;
+namespace catgirlwindow.Tests;
 
 public class BuiltinTaskHandlerTests : IDisposable
 {

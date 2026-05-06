@@ -5,6 +5,9 @@ namespace catgirlwindow.Src.Core.Config.Models
     /// </summary>
     public class AppSettings
     {
+        /// <summary>用户名称（LLM 对用户的称呼）</summary>
+        public string UserName { get; set; } = "主人";
+
         /// <summary>当前激活的人格名称（对应 Resources/Personalities/ 下的 {名称}_person.json）</summary>
         public string ActivePersonality { get; set; } = "default";
 

@@ -32,19 +32,29 @@ namespace catgirlwindow.Src.Core.Events
     /// <summary>
     /// 事件调度器接口
     /// 统一管理所有事件的发布和订阅，以及定时任务调度
+    /// 支持同步和异步两种订阅模式
     /// </summary>
     public interface IEventDispatcher
     {
         // ========== 事件发布/订阅 ==========
 
-        /// <summary>发布事件</summary>
+        /// <summary>同步发布事件（不会等待异步订阅者）</summary>
         void Publish(EventData eventData);
 
-        /// <summary>订阅指定分类的事件</summary>
+        /// <summary>异步发布事件（等待所有异步订阅者完成）</summary>
+        Task PublishAsync(EventData eventData);
+
+        /// <summary>订阅指定分类的事件（同步处理器）</summary>
         string Subscribe(EventCategory category, Action<EventData> handler);
 
-        /// <summary>订阅所有事件</summary>
+        /// <summary>订阅指定分类的事件（异步处理器）</summary>
+        string Subscribe(EventCategory category, Func<EventData, Task> handler);
+
+        /// <summary>订阅所有事件（同步处理器）</summary>
         string SubscribeAll(Action<EventData> handler);
+
+        /// <summary>订阅所有事件（异步处理器）</summary>
+        string SubscribeAll(Func<EventData, Task> handler);
 
         /// <summary>取消订阅</summary>
         void Unsubscribe(string subscriptionId);

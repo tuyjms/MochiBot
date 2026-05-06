@@ -1,4 +1,4 @@
-using catgirlwindow.SrcUI;
+using catgirlwindow.Src.UI;
 
 namespace catgirlwindow
 {

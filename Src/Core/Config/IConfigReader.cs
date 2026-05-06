@@ -1,4 +1,5 @@
 using catgirlwindow.Src.Core.Config.Models;
+using catgirlwindow.Src.Core.Events;
 
 namespace catgirlwindow.Src.Core.Config
 {
@@ -55,6 +56,12 @@ namespace catgirlwindow.Src.Core.Config
         /// <param name="subPersonalityName">子人格名称</param>
         /// <returns>(chatModels, visionModels) 元组，visionModels 可能为 null</returns>
         (List<string> chatModels, List<string>? visionModels) GetPersonalityModels(string subPersonalityName);
+
+
+        // ========== 定时任务配置 ==========
+
+        /// <summary>获取所有内置定时任务配置</summary>
+        List<CronTask> GetCronTasks();
 
 
         // ========== 配置重载 ==========

@@ -1,5 +1,5 @@
 using catgirlwindow.Src.Agent;
-namespace catgirlwindow.SrcTests;
+namespace catgirlwindow.Tests;
 
 public class PromptFormatterTests
 {

@@ -6,13 +6,13 @@ using catgirlwindow.Src.Models;
 using catgirlwindow.Src.Services.Tool;
 using catgirlwindow.Src.Services;
 
-namespace catgirlwindow.SrcUI
+namespace catgirlwindow.Src.UI
 {
     public partial class Form1 : Form
     {
         private readonly LlmClient _llmClient = new();
         private IAgent _agent;
-        private IShortTermMemory _shortTermMemory;
+        private IEventDispatcher _eventDispatcher;
         private bool _isInitializing = true;
 
         public Form1()
@@ -27,27 +27,24 @@ namespace catgirlwindow.SrcUI
             var formatter = new PromptFormatter("");
 
             // ToolService 不再依赖 IAgentMoodTracker，情绪变化通过 LLM 的 mood_change action 处理
-            var toolService = new ToolService(_llmClient, formatter);
-
-            // 保存短期记忆引用，用于提供商切换时保留对话历史
-            _shortTermMemory = shortTermMemory;
+            var toolService = new ToolService(_llmClient, formatter, configReader);
 
             // 创建事件调度器（同时负责定时任务调度）
-            var eventDispatcher = new EventDispatcher();
+            _eventDispatcher = new EventDispatcher();
 
             // 初始化内置任务（从配置文件读取）
-            var taskInitializer = new BuiltinTaskInitializer(eventDispatcher, configReader);
+            var taskInitializer = new BuiltinTaskInitializer(_eventDispatcher, configReader);
             taskInitializer.Initialize();
 
             // 创建内置任务处理器（订阅 SystemAuto 事件，处理碎碎念/用眼提醒/深夜关怀/空闲检测）
-            var taskHandler = new BuiltinTaskHandler(eventDispatcher);
+            var taskHandler = new BuiltinTaskHandler(_eventDispatcher);
 
             // 启动定时任务调度器
-            eventDispatcher.StartScheduler();
+            _eventDispatcher.StartScheduler();
 
             // 创建 Agent（通过事件调度器接收事件）
             _agent = new MainAgent(
-                eventDispatcher,
+                _eventDispatcher,
                 _llmClient,
                 configReader,
                 formatter,
@@ -56,6 +53,9 @@ namespace catgirlwindow.SrcUI
 
             // 订阅 Agent 的情绪变化事件（用于更新 UI）
             _agent.MoodChanged += OnAgentMoodChanged;
+
+            // 订阅回复事件（Agent 处理完成后发布）
+            _eventDispatcher.Subscribe(EventCategory.ToolResult, OnAgentReply);
 
             InitializeProviders();
         }
@@ -82,6 +82,35 @@ namespace catgirlwindow.SrcUI
                 _ => "😐 平静"
             };
             Text = $"猫娘窗口 - {moodName}";
+        }
+
+        /// <summary>Agent 回复事件回调（显示回复内容）</summary>
+        private void OnAgentReply(EventData eventData)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(eventData.Info);
+                if (!doc.RootElement.TryGetProperty("type", out var typeProp)) return;
+                if (typeProp.GetString() != "reply") return;
+                if (!doc.RootElement.TryGetProperty("content", out var contentProp)) return;
+
+                var reply = contentProp.GetString();
+                if (string.IsNullOrEmpty(reply)) return;
+
+                // 获取角色名称
+                var personality = ConfigReader.Instance.GetActivePersonality();
+                var agentName = personality?.Name ?? "小琪";
+
+                if (InvokeRequired)
+                {
+                    Invoke(() => AppendChat(agentName, reply));
+                }
+                else
+                {
+                    AppendChat(agentName, reply);
+                }
+            }
+            catch { }
         }
 
         private void InitializeProviders()
@@ -123,12 +152,13 @@ namespace catgirlwindow.SrcUI
 
             try
             {
-                // 使用 Agent 处理用户输入
-                var response = await _agent.ProcessUserInputAsync(prompt);
-                // 从人格配置中获取角色名称
-                var personality = ConfigReader.Instance.GetActivePersonality();
-                var agentName = personality?.Name ?? "小琪";
-                AppendChat(agentName, response);
+                // 通过事件调度器异步发布用户输入事件，Agent 订阅后处理
+                await _eventDispatcher.PublishAsync(new EventData
+                {
+                    Category = EventCategory.UserInput,
+                    Trigger = EventTrigger.User,
+                    Info = prompt
+                });
             }
             catch (Exception ex)
             {

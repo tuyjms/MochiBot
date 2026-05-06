@@ -20,61 +20,19 @@ namespace catgirlwindow.Src.Core.Events
 
         /// <summary>
         /// 初始化所有内置任务
-        /// 从 ModuleSettings 读取配置并注册到事件调度器
+        /// 从配置文件的 CronTasks 数组读取任务配置并注册到事件调度器
         /// </summary>
         public void Initialize()
         {
-            var settings = _configReader.GetModuleSettings();
+            var cronTasks = _configReader.GetCronTasks();
 
-            // 1. 碎碎念 - 随机触发，表达思念或关心
-            if (settings.AutoEvent_MurmurEnabled)
+            foreach (var task in cronTasks)
             {
-                _eventDispatcher.RegisterTask(new CronTask
+                if (task.Enabled)
                 {
-                    Id = "builtin:murmur",
-                    Name = "碎碎念",
-                    TaskType = "murmur",
-                    CronExpression = $"*/{settings.AutoEvent_MurmurInterval} * * * *",
-                    Parameters = settings.AutoEvent_MurmurWeight.ToString(),
-                    Enabled = true
-                });
+                    _eventDispatcher.RegisterTask(task);
+                }
             }
-
-            // 2. 用眼提醒 - 用户连续使用电脑超阈值
-            _eventDispatcher.RegisterTask(new CronTask
-            {
-                Id = "builtin:eye_rest",
-                Name = "用眼提醒",
-                TaskType = "eye_rest",
-                CronExpression = "* * * * *",
-                Parameters = settings.AutoEvent_EyeRestInterval.ToString(),
-                Enabled = true
-            });
-
-            // 3. 深夜关怀 - 深夜时段触发
-            if (TimeSpan.TryParse(settings.AutoEvent_LateNightStart, out var lateNightStart))
-            {
-                _eventDispatcher.RegisterTask(new CronTask
-                {
-                    Id = "builtin:late_night",
-                    Name = "深夜关怀",
-                    TaskType = "late_night",
-                    CronExpression = $"{lateNightStart.Minutes} {lateNightStart.Hours} * * *",
-                    Parameters = $"{settings.AutoEvent_LateNightOffsetMin},{settings.AutoEvent_LateNightOffsetMax}",
-                    Enabled = true
-                });
-            }
-
-            // 4. 空闲检测 - 用户长时间未交互
-            _eventDispatcher.RegisterTask(new CronTask
-            {
-                Id = "builtin:idle_check",
-                Name = "空闲检测",
-                TaskType = "idle_check",
-                CronExpression = "* * * * *",
-                Parameters = settings.AutoEvent_IdleThreshold.ToString(),
-                Enabled = true
-            });
         }
 
         /// <summary>

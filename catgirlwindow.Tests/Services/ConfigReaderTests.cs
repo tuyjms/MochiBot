@@ -1,5 +1,5 @@
 using catgirlwindow.Src.Core.Config;
-namespace catgirlwindow.SrcTests;
+namespace catgirlwindow.Tests;
 
 public class ConfigReaderTests : IDisposable
 {

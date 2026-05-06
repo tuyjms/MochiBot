@@ -1,4 +1,4 @@
-﻿namespace catgirlwindow.SrcUI;
+﻿namespace catgirlwindow.Src.UI;
 
 partial class Form1
 {

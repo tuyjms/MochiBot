@@ -9,7 +9,7 @@ namespace catgirlwindow.Src.Core.Events
     /// <summary>
     /// 事件调度器实现
     /// 统一管理所有事件的发布和订阅，以及定时任务调度
-    /// 内置任务的具体检查逻辑由 BuiltinTaskHandler 负责
+    /// 支持同步和异步两种订阅模式
     /// </summary>
     public class EventDispatcher : IEventDispatcher, IDisposable
     {
@@ -38,7 +38,13 @@ namespace catgirlwindow.Src.Core.Events
                 }
                 foreach (var sub in snapshot)
                 {
-                    try { sub.Handler(eventData); }
+                    try
+                    {
+                        if (sub.SyncHandler != null)
+                            sub.SyncHandler(eventData);
+                        else if (sub.AsyncHandler != null)
+                            _ = sub.AsyncHandler(eventData); // fire-and-forget
+                    }
                     catch { /* 防止单个订阅者异常影响其他订阅者 */ }
                 }
             }
@@ -51,8 +57,72 @@ namespace catgirlwindow.Src.Core.Events
             }
             foreach (var sub in allSnapshot)
             {
-                try { sub.Handler(eventData); }
+                try
+                {
+                    if (sub.SyncHandler != null)
+                        sub.SyncHandler(eventData);
+                    else if (sub.AsyncHandler != null)
+                        _ = sub.AsyncHandler(eventData); // fire-and-forget
+                }
                 catch { /* 防止单个订阅者异常影响其他订阅者 */ }
+            }
+        }
+
+        public async Task PublishAsync(EventData eventData)
+        {
+            var tasks = new List<Task>();
+
+            // 通知指定分类的订阅者
+            if (_categorySubscriptions.TryGetValue(eventData.Category, out var categorySubs))
+            {
+                List<Subscription> snapshot;
+                lock (_lock)
+                {
+                    snapshot = new List<Subscription>(categorySubs);
+                }
+                foreach (var sub in snapshot)
+                {
+                    try
+                    {
+                        if (sub.AsyncHandler != null)
+                            tasks.Add(sub.AsyncHandler(eventData));
+                        else if (sub.SyncHandler != null)
+                            sub.SyncHandler(eventData);
+                    }
+                    catch { /* 防止单个订阅者异常影响其他订阅者 */ }
+                }
+            }
+
+            // 通知所有事件的订阅者
+            List<Subscription> allSnapshot;
+            lock (_lock)
+            {
+                allSnapshot = new List<Subscription>(_allSubscriptions);
+            }
+            foreach (var sub in allSnapshot)
+            {
+                try
+                {
+                    if (sub.AsyncHandler != null)
+                        tasks.Add(sub.AsyncHandler(eventData));
+                    else if (sub.SyncHandler != null)
+                        sub.SyncHandler(eventData);
+                }
+                catch { /* 防止单个订阅者异常影响其他订阅者 */ }
+            }
+
+            // 等待所有异步订阅者完成（捕获异常防止影响调用者）
+            if (tasks.Count > 0)
+            {
+                try
+                {
+                    await Task.WhenAll(tasks);
+                }
+                catch
+                {
+                    // 单个订阅者的异常已在添加 task 时被 catch，但 Task.WhenAll 会重新抛出
+                    // 这里再次捕获以确保不会影响其他订阅者或调用者
+                }
             }
         }
 
@@ -61,7 +131,24 @@ namespace catgirlwindow.Src.Core.Events
             var subscription = new Subscription
             {
                 Id = Guid.NewGuid().ToString(),
-                Handler = handler
+                SyncHandler = handler
+            };
+
+            lock (_lock)
+            {
+                var subs = _categorySubscriptions.GetOrAdd(category, _ => new List<Subscription>());
+                subs.Add(subscription);
+            }
+
+            return subscription.Id;
+        }
+
+        public string Subscribe(EventCategory category, Func<EventData, Task> handler)
+        {
+            var subscription = new Subscription
+            {
+                Id = Guid.NewGuid().ToString(),
+                AsyncHandler = handler
             };
 
             lock (_lock)
@@ -78,7 +165,23 @@ namespace catgirlwindow.Src.Core.Events
             var subscription = new Subscription
             {
                 Id = Guid.NewGuid().ToString(),
-                Handler = handler
+                SyncHandler = handler
+            };
+
+            lock (_lock)
+            {
+                _allSubscriptions.Add(subscription);
+            }
+
+            return subscription.Id;
+        }
+
+        public string SubscribeAll(Func<EventData, Task> handler)
+        {
+            var subscription = new Subscription
+            {
+                Id = Guid.NewGuid().ToString(),
+                AsyncHandler = handler
             };
 
             lock (_lock)
@@ -189,17 +292,28 @@ namespace catgirlwindow.Src.Core.Events
 
         // ========== Cron 任务检查 ==========
 
+        // 记录每个任务上次触发的时间（分钟级），防止同一分钟内重复触发
+        private readonly Dictionary<string, int> _lastTaskTriggerMinute = new();
+
         private void CheckCronTasks()
         {
             var now = DateTime.Now;
+            var currentMinute = now.Hour * 60 + now.Minute;
 
             lock (_tasks)
             {
                 foreach (var task in _tasks)
                 {
                     if (!task.Enabled) continue;
+
+                    // 检查是否在同一分钟内已经触发过
+                    if (_lastTaskTriggerMinute.TryGetValue(task.Id, out var lastMinute) && lastMinute == currentMinute)
+                        continue;
+
                     if (MatchesCron(task.CronExpression, now))
                     {
+                        _lastTaskTriggerMinute[task.Id] = currentMinute;
+
                         Publish(new EventData
                         {
                             Category = EventCategory.SystemAuto,
@@ -290,7 +404,8 @@ namespace catgirlwindow.Src.Core.Events
         private class Subscription
         {
             public string Id { get; set; } = string.Empty;
-            public Action<EventData> Handler { get; set; } = _ => { };
+            public Action<EventData>? SyncHandler { get; set; }
+            public Func<EventData, Task>? AsyncHandler { get; set; }
         }
 
         public void Dispose()

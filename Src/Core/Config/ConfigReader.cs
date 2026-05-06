@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using catgirlwindow.Src.Core.Config.Models;
+using catgirlwindow.Src.Core.Events;
 
 namespace catgirlwindow.Src.Core.Config
 {
@@ -64,11 +65,14 @@ namespace catgirlwindow.Src.Core.Config
 
         /// <summary>
         /// 重新加载配置文件
+        /// 如果配置文件不存在，则生成一个包含默认配置的文件
         /// </summary>
         public void Reload()
         {
             if (!File.Exists(_configPath))
-                throw new FileNotFoundException($"Configuration file '{_configPath}' not found.");
+            {
+                GenerateDefaultConfig();
+            }
 
             var json = File.ReadAllText(_configPath);
             _cachedDoc = JsonDocument.Parse(json);
@@ -80,6 +84,43 @@ namespace catgirlwindow.Src.Core.Config
             InitLogFileWriter();
 
             _logger.Info("配置已重新加载");
+        }
+
+        /// <summary>
+        /// 生成默认配置文件（使用模型类序列化，确保字段完整）
+        /// </summary>
+        private void GenerateDefaultConfig()
+        {
+            var dir = Path.GetDirectoryName(_configPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            var defaultConfig = new
+            {
+                Providers = new Dictionary<string, Models.ProviderConfig>
+                {
+                    ["LocalLMStudio"] = new Models.ProviderConfig
+                    {
+                        ApiKey = "not-needed",
+                        BaseUrl = "http://localhost:1234/v1",
+                        ContextLimit = 4096
+                    }
+                },
+                AppSettings = new AppSettings(),
+                ModuleSettings = new ModuleSettings(),
+                CronTasks = new List<CronTask>
+                {
+                    new() { Id = "builtin:murmur", Name = "碎碎念", TaskType = "murmur", CronExpression = "*/30 * * * *", Parameters = "30", Enabled = true },
+                    new() { Id = "builtin:eye_rest", Name = "用眼提醒", TaskType = "eye_rest", CronExpression = "*/5 * * * *", Parameters = "120", Enabled = true },
+                    new() { Id = "builtin:late_night", Name = "深夜关怀", TaskType = "late_night", CronExpression = "0 23 * * *", Parameters = "-30,30", Enabled = true },
+                    new() { Id = "builtin:idle_check", Name = "空闲检测", TaskType = "idle_check", CronExpression = "*/2 * * * *", Parameters = "5", Enabled = true }
+                }
+            };
+
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            var json = JsonSerializer.Serialize(defaultConfig, options);
+            File.WriteAllText(_configPath, json);
+            _logger.Info($"配置文件不存在，已生成默认配置: {_configPath}");
         }
 
         // ========== LLM提供商配置 ==========
@@ -138,6 +179,30 @@ namespace catgirlwindow.Src.Core.Config
             {
                 return defaultValue;
             }
+        }
+
+        // ========== 定时任务配置 ==========
+
+        public List<CronTask> GetCronTasks()
+        {
+            EnsureLoaded();
+            if (_cachedDoc == null) return new List<CronTask>();
+
+            if (_cachedDoc.RootElement.TryGetProperty("CronTasks", out var cronTasksElement) &&
+                cronTasksElement.ValueKind == JsonValueKind.Array)
+            {
+                try
+                {
+                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var tasks = JsonSerializer.Deserialize<List<CronTask>>(cronTasksElement.GetRawText(), options);
+                    return tasks ?? new List<CronTask>();
+                }
+                catch
+                {
+                    return new List<CronTask>();
+                }
+            }
+            return new List<CronTask>();
         }
 
         // ========== 人格配置 ==========
@@ -273,6 +338,7 @@ namespace catgirlwindow.Src.Core.Config
             var settings = new AppSettings();
             if (root.TryGetProperty("AppSettings", out var appSettingsElement))
             {
+                settings.UserName = GetStringProperty(appSettingsElement, "UserName", "主人");
                 settings.ActivePersonality = GetStringProperty(appSettingsElement, "ActivePersonality", "default");
                 settings.EnableStructuredResponse = GetBoolProperty(appSettingsElement, "EnableStructuredResponse", true);
                 settings.MaxActionsPerResponse = GetIntProperty(appSettingsElement, "MaxActionsPerResponse", 5);
@@ -313,6 +379,15 @@ namespace catgirlwindow.Src.Core.Config
                         prop.SetValue(_cachedModuleSettings, value.GetBoolean());
                     else if (prop.PropertyType == typeof(string))
                         prop.SetValue(_cachedModuleSettings, value.GetString() ?? "");
+                    else if (prop.PropertyType == typeof(List<string>))
+                    {
+                        var list = new List<string>();
+                        foreach (var item in value.EnumerateArray())
+                        {
+                            list.Add(item.GetString() ?? "");
+                        }
+                        prop.SetValue(_cachedModuleSettings, list);
+                    }
                 }
                 catch
                 {

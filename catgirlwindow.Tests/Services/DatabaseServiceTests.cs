@@ -1,7 +1,7 @@
 using catgirlwindow.Src.Core.Database;
 using catgirlwindow.Src.Core.Models;
 using catgirlwindow.Src.Models;
-namespace catgirlwindow.SrcTests;
+namespace catgirlwindow.Tests;
 
 public class DatabaseServiceTests : IDisposable
 {
