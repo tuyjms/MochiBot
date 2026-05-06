@@ -67,7 +67,7 @@ MochiBot/
 │   ├── Data/                 # 运行时数据
 │   ├── Images/               # 图片资源
 │   └── Plugins/              # JS 插件
-├── catgirlwindow.Tests/      # 单元测试项目
+├── catgirlwindow.SrcTests/      # 单元测试项目
 │   ├── Services/             # 服务层测试
 │   │   └── DatabaseServiceTests.cs
 │   └── Models/               # 模型测试（预留）

@@ -67,7 +67,7 @@ Services/
 
 ```txt
 catgirlwindow.Tests/
-├── catgirlwindow.Tests.csproj    # 测试项目配置
+├── catgirlwindow.SrcTests.csproj    # 测试项目配置
 ├── Services/                     # 服务层测试
 │   ├── DatabaseServiceTests.cs   # 数据库业务层测试
 │   └── ConfigReaderTests.cs      # 配置读取器测试
@@ -78,10 +78,10 @@ catgirlwindow.Tests/
 
 ```bash
 # 运行所有测试
-dotnet test catgirlwindow.Tests/catgirlwindow.Tests.csproj
+dotnet test catgirlwindow.SrcTests/catgirlwindow.Tests.csproj
 
 # 运行指定测试类（按名称筛选）
-dotnet test catgirlwindow.Tests/catgirlwindow.Tests.csproj --filter "FullyQualifiedName~DatabaseServiceTests"
+dotnet test catgirlwindow.SrcTests/catgirlwindow.Tests.csproj --filter "FullyQualifiedName~DatabaseServiceTests"
 ```
 
 ### 编写测试的注意事项

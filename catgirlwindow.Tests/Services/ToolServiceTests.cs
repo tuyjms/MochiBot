@@ -1,7 +1,7 @@
-using catgirlwindow.Models;
-using catgirlwindow.Services;
+using catgirlwindow.SrcModels;
+using catgirlwindow.Src.Services;
 
-namespace catgirlwindow.Tests;
+namespace catgirlwindow.SrcTests;
 
 public class ToolServiceTests : IDisposable
 {
@@ -40,7 +40,7 @@ public class ToolServiceTests : IDisposable
     public void GetToolDefinitions_ShouldReturnCorrectCount()
     {
         var tools = _service.GetToolDefinitions();
-        Assert.Equal(5, tools.Count);
+        Assert.Equal(7, tools.Count);
     }
 
     [Fact]

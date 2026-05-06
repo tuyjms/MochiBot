@@ -1,6 +1,6 @@
-using catgirlwindow.Services;
+using catgirlwindow.Src.Services;
 
-namespace catgirlwindow.Tests;
+namespace catgirlwindow.SrcTests;
 
 public class AutoEventServiceTests : IDisposable
 {
