@@ -1,4 +1,3 @@
-using catgirlwindow.Src.Agent;
 using catgirlwindow.Src.Core.Models;
 using catgirlwindow.Src.Models;
 
@@ -46,7 +45,8 @@ namespace catgirlwindow.Src.Services
     }
 
     /// <summary>
-    /// 工具功能服务接口
+    /// 工具调度器接口
+    /// 统一管理基础工具、心情特色工具、JS插件工具、MCP工具
     /// </summary>
     public interface IToolService
     {
@@ -60,10 +60,17 @@ namespace catgirlwindow.Src.Services
         /// <summary>列出所有已加载的JS插件及其描述（供LLM通过 list_plugins 调用）</summary>
         Task<List<ToolDefinition>> ListPluginsAsync();
 
-        /// <summary>执行指定工具</summary>
+        /// <summary>列出所有已注册的MCP服务器工具（供LLM通过 list_plugins 调用）</summary>
+        Task<List<ToolDefinition>> ListMcpToolsAsync();
+
+        /// <summary>统一执行工具调度（自动识别工具类型）</summary>
         /// <param name="toolName">工具名称</param>
         /// <param name="parameters">参数（JSON字符串）</param>
         Task<ToolResult> ExecuteToolAsync(string toolName, string parameters);
+
+        /// <summary>加载JS插件</summary>
+        /// <param name="pluginDirectory">插件目录</param>
+        Task LoadPluginsAsync(string pluginDirectory);
 
         // ========== 计时器 ==========
 

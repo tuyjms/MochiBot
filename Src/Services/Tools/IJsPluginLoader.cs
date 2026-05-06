@@ -1,4 +1,4 @@
-namespace catgirlwindow.Src.Services
+namespace catgirlwindow.Src.Services.Tool
 {
     /// <summary>
     /// JS插件加载器接口

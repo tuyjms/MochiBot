@@ -3,6 +3,7 @@ using catgirlwindow.Src.Agent;
 using catgirlwindow.Src.Core.Config;
 using catgirlwindow.Src.Core.Events;
 using catgirlwindow.Src.Models;
+using catgirlwindow.Src.Services.Tool;
 using catgirlwindow.Src.Services;
 
 namespace catgirlwindow.SrcUI

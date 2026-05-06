@@ -4,6 +4,7 @@ using catgirlwindow.Src.Core.Config.Models;
 using catgirlwindow.Src.Core.Database;
 using catgirlwindow.Src.Core.Events;
 using catgirlwindow.Src.Models;
+using catgirlwindow.Src.Services.Tool;
 using catgirlwindow.Src.Services;
 using OpenAiChatMessage = OpenAI.Chat.ChatMessage;
 using OpenAiSystemChatMessage = OpenAI.Chat.SystemChatMessage;
@@ -40,6 +41,7 @@ namespace catgirlwindow.Src.Agent
         /// <summary>情绪变化时触发的事件（UI订阅以更新头像）</summary>
         public event EventHandler<AgentMood>? MoodChanged;
 
+        private readonly ActionExecutor _actionExecutor;
         private bool _isProcessing;
         private string _lastEvent = string.Empty;
         private string _lastJsonError = string.Empty;
@@ -88,6 +90,13 @@ namespace catgirlwindow.Src.Agent
 
             _appSettings = configReader.GetAppSettings();
             _personality = configReader.GetActivePersonality();
+
+            // 创建 ActionExecutor，将 actions 执行逻辑委托给它
+            _actionExecutor = new ActionExecutor(
+                _toolService,
+                mood => SetMood(mood),
+                (desc, param) => _shortTermMemory.AddMessage("system", $"[中期记忆] {desc}"),
+                anim => _lastEvent = $"animation:{anim}");
 
             // 订阅事件调度器
             SubscribeToEvents();
@@ -344,13 +353,15 @@ namespace catgirlwindow.Src.Agent
             return result.Success ? result.Data : $"错误：{result.Error}";
         }
 
-        public Task<string> ProcessPluginCallAsync(string pluginName, string parameters)
+        public async Task<string> ProcessPluginCallAsync(string pluginName, string parameters)
         {
-            return Task.FromResult($"插件 '{pluginName}' 暂未实现");
+            var result = await _toolService.ExecuteToolAsync(pluginName, parameters);
+            return result.Success ? result.Data : $"错误：{result.Error}";
         }
 
         public Task<string> ProcessMcpCallAsync(string serverName, string toolName, string parameters)
         {
+            // MCP 工具调用（留空，作为 feature 后续实现）
             return Task.FromResult($"MCP服务器 '{serverName}' 的工具 '{toolName}' 暂未实现");
         }
 
@@ -532,82 +543,25 @@ namespace catgirlwindow.Src.Agent
         /// <summary>执行 actions 数组，返回从 reply 工具中提取的回复文本（如果没有 reply 则返回空字符串）</summary>
         private async Task<string> ExecuteActionsAsync(List<AgentAction>? actions)
         {
-            var replyText = string.Empty;
-            if (actions == null || actions.Count == 0) return replyText;
+            var replyText = await _actionExecutor.ExecuteActionsAsync(actions, _appSettings.MaxActionsPerResponse);
 
-            var maxActions = _appSettings.MaxActionsPerResponse;
-            var count = 0;
-
-            foreach (var action in actions)
+            // 记录工具执行结果到短期记忆
+            if (actions != null)
             {
-                if (count >= maxActions) break;
-                count++;
-
-                try
+                foreach (var action in actions)
                 {
-                    switch (action.Type)
+                    if (action.Type == "tool_call" && action.Name != "reply")
                     {
-                        case "tool_call":
-                            // 如果是 reply 工具，提取回复文本
-                            if (action.Name == "reply" && !string.IsNullOrEmpty(action.Parameters))
-                            {
-                                try
-                                {
-                                    using var doc = JsonDocument.Parse(action.Parameters);
-                                    if (doc.RootElement.TryGetProperty("reply_text", out var replyElement))
-                                    {
-                                        replyText = replyElement.GetString() ?? string.Empty;
-                                    }
-                                }
-                                catch
-                                {
-                                    // 解析失败则忽略
-                                }
-                            }
-                            else
-                            {
-                                var toolResult = await _toolService.ExecuteToolAsync(
-                                    action.Name ?? "",
-                                    action.Parameters ?? "{}");
-                                _shortTermMemory.AddMessage("system",
-                                    $"[工具执行] {action.Name}: {(toolResult.Success ? "成功" : $"失败: {toolResult.Error}")}");
-                            }
-                            break;
-
-                        case "plugin_call":
-                            var pluginResult = await ProcessPluginCallAsync(
-                                action.Name ?? "",
-                                action.Parameters ?? "{}");
-                            _shortTermMemory.AddMessage("system", $"[插件执行] {action.Name}: {pluginResult}");
-                            break;
-
-                        case "mcp_call":
-                            var mcpResult = await ProcessMcpCallAsync(
-                                action.ServerName ?? "",
-                                action.Name ?? "",
-                                action.Parameters ?? "{}");
-                            _shortTermMemory.AddMessage("system", $"[MCP执行] {action.ServerName}/{action.Name}: {mcpResult}");
-                            break;
-
-                        case "mood_change":
-                            if (Enum.TryParse<AgentMood>(action.Mood, true, out var mood))
-                            {
-                                SetMood(mood);
-                            }
-                            break;
-
-                        case "midterm_memory":
-                            // 中期记忆已合并到长期记忆模块，暂不处理
-                            break;
-
-                        case "animation":
-                            _lastEvent = $"animation:{action.Animation}";
-                            break;
+                        _shortTermMemory.AddMessage("system", $"[工具执行] {action.Name}");
                     }
-                }
-                catch (Exception ex)
-                {
-                    _shortTermMemory.AddMessage("system", $"[执行错误] {action.Type}: {ex.Message}");
+                    else if (action.Type == "plugin_call")
+                    {
+                        _shortTermMemory.AddMessage("system", $"[插件执行] {action.Name}");
+                    }
+                    else if (action.Type == "mcp_call")
+                    {
+                        _shortTermMemory.AddMessage("system", $"[MCP执行] {action.ServerName}/{action.Name}");
+                    }
                 }
             }
 

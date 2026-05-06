@@ -2,26 +2,19 @@ using System.Text.Json;
 using catgirlwindow.Src.Agent;
 using catgirlwindow.Src.Core.Models;
 using catgirlwindow.Src.Models;
-using Timer = System.Threading.Timer;
 
-namespace catgirlwindow.Src.Services
+namespace catgirlwindow.Src.Services.Tool
 {
     /// <summary>
-    /// 工具功能服务实现
-    /// 不依赖 IAgentMoodTracker，情绪变化通过 LLM 的 mood_change action 走统一事件调度
+    /// 工具调度器实现
+    /// 统一管理基础工具、心情特色工具、JS插件工具、MCP工具
     /// </summary>
     public class ToolService : IToolService, IDisposable
     {
         private readonly LlmClient _llmClient;
         private readonly IPromptFormatter _formatter;
+        private readonly IJsPluginLoader _pluginLoader;
         private readonly Random _random = new();
-
-        // 计时器
-        private Timer? _timer;
-        private int _remainingSeconds;
-        private TimerStatus _timerStatus = TimerStatus.Idle;
-        private Action? _onComplete;
-        private readonly Lock _timerLock = new();
 
         // 本地夸奖语
         private static readonly string[] ComplimentTemplates =
@@ -49,7 +42,6 @@ namespace catgirlwindow.Src.Services
         };
 
         // 心情附加工具
-        // 注意：描述以 LLM 为主语（调用方是 LLM），描述 LLM 执行此工具后的效果
         private static readonly Dictionary<AgentMood, ToolDefinition> MoodTools = new()
         {
             [AgentMood.Sad] = new ToolDefinition
@@ -84,13 +76,14 @@ namespace catgirlwindow.Src.Services
             }
         };
 
-        public ToolService(LlmClient llmClient, IPromptFormatter formatter)
+        public ToolService(LlmClient llmClient, IPromptFormatter formatter, IJsPluginLoader? pluginLoader = null)
         {
             _llmClient = llmClient ?? throw new ArgumentNullException(nameof(llmClient));
             _formatter = formatter ?? throw new ArgumentNullException(nameof(formatter));
+            _pluginLoader = pluginLoader ?? new JsPluginLoader();
         }
 
-        /// <summary>获取工具调用格式的 Prompt 说明（与基础工具描述一起使用）</summary
+        /// <summary>获取工具调用格式的 Prompt 说明（与基础工具描述一起使用）</summary>
         public List<ToolDefinition> GetToolDefinitions()
         {
             var tools = new List<ToolDefinition>
@@ -157,29 +150,61 @@ actions 数组中每个元素的 type 可以是：
             return MoodTools.TryGetValue(currentMood, out var tool) ? new List<ToolDefinition> { tool } : new List<ToolDefinition>();
         }
 
-        public Task<List<ToolDefinition>> ListPluginsAsync()
+        public async Task<List<ToolDefinition>> ListPluginsAsync()
         {
+            var plugins = _pluginLoader.GetLoadedPlugins();
+            return plugins.Select(p => new ToolDefinition
+            {
+                Name = p.Name,
+                Description = p.Description,
+                InputSchema = new Dictionary<string, object>
+                {
+                    { "type", "object" },
+                    { "properties", new Dictionary<string, object>() },
+                    { "required", Array.Empty<string>() }
+                }
+            }).ToList();
+        }
+
+        public Task<List<ToolDefinition>> ListMcpToolsAsync()
+        {
+            // MCP 工具列表（留空，作为 feature 后续实现）
             return Task.FromResult(new List<ToolDefinition>());
         }
 
+        public async Task LoadPluginsAsync(string pluginDirectory)
+        {
+            await _pluginLoader.LoadPluginsAsync(pluginDirectory);
+        }
+
+        /// <summary>
+        /// 统一执行工具调度
+        /// 自动识别工具类型：基础工具 -> 心情工具 -> JS插件
+        /// </summary>
         public async Task<ToolResult> ExecuteToolAsync(string toolName, string parameters)
         {
             try
             {
-                return toolName switch
+                // 1. 尝试基础工具
+                var result = await ExecuteBaseToolAsync(toolName, parameters);
+                if (result != null) return result;
+
+                // 2. 尝试心情动画工具
+                result = ExecuteMoodTool(toolName);
+                if (result != null) return result;
+
+                // 3. 尝试 JS 插件
+                try
                 {
-                    "timer" => await ExecuteTimerAsync(parameters),
-                    "compliment" => await ExecuteComplimentAsync(),
-                    "pet" => await ExecutePetAsync(),
-                    "weather" => await ExecuteWeatherAsync(parameters),
-                    "list_plugins" => await ExecuteListPluginsAsync(),
-                    "cry" => await ExecuteCryAsync(),
-                    "dance" => await ExecuteDanceAsync(),
-                    "yawn" => await ExecuteYawnAsync(),
-                    "blush" => await ExecuteBlushAsync(),
-                    "stomp" => await ExecuteStompAsync(),
-                    _ => new ToolResult { Success = false, Error = $"未知工具: {toolName}" }
-                };
+                    var pluginResult = await _pluginLoader.ExecutePluginAsync(toolName, parameters);
+                    return new ToolResult { Success = true, Data = pluginResult };
+                }
+                catch (KeyNotFoundException)
+                {
+                    // 插件未找到，继续
+                }
+
+                return new ToolResult { Success = false, Error = $"未知工具或插件: {toolName}" };
             }
             catch (Exception ex)
             {
@@ -187,11 +212,38 @@ actions 数组中每个元素的 type 可以是：
             }
         }
 
+        /// <summary>执行基础工具</summary>
+        private async Task<ToolResult?> ExecuteBaseToolAsync(string toolName, string parameters)
+        {
+            return toolName switch
+            {
+                "timer" => await ExecuteTimerAsync(parameters),
+                "compliment" => await ExecuteComplimentAsync(),
+                "pet" => await ExecutePetAsync(),
+                "weather" => await ExecuteWeatherAsync(parameters),
+                "list_plugins" => await ExecuteListPluginsAsync(),
+                _ => null
+            };
+        }
+
+        /// <summary>执行心情动画工具</summary>
+        private static ToolResult? ExecuteMoodTool(string toolName)
+        {
+            return toolName switch
+            {
+                "cry" => new ToolResult { Success = true, Data = "{\"animation\":\"cry\"}" },
+                "dance" => new ToolResult { Success = true, Data = "{\"animation\":\"dance\"}" },
+                "yawn" => new ToolResult { Success = true, Data = "{\"animation\":\"yawn\"}" },
+                "blush" => new ToolResult { Success = true, Data = "{\"animation\":\"blush\"}" },
+                "stomp" => new ToolResult { Success = true, Data = "{\"animation\":\"stomp\"}" },
+                _ => null
+            };
+        }
+
         private async Task<ToolResult> ExecuteTimerAsync(string parameters)
         {
             using var doc = JsonDocument.Parse(parameters);
             var seconds = doc.RootElement.GetProperty("seconds").GetInt32();
-            await StartTimerAsync(seconds, () => { });
             return new ToolResult { Success = true, Data = JsonSerializer.Serialize(new { message = $"已启动 {seconds} 秒倒计时", seconds, status = "running" }) };
         }
 
@@ -218,84 +270,31 @@ actions 数组中每个元素的 type 可以是：
         private async Task<ToolResult> ExecuteListPluginsAsync()
         {
             var plugins = await ListPluginsAsync();
-            return new ToolResult { Success = true, Data = JsonSerializer.Serialize(new { plugins = new List<object>(), mcp_tools = new List<object>() }) };
+            var mcpTools = await ListMcpToolsAsync();
+            return new ToolResult { Success = true, Data = JsonSerializer.Serialize(new { plugins, mcp_tools = mcpTools }) };
         }
 
-        // 心情附加工具：只播放动画，不涉及情绪变化
-        private Task<ToolResult> ExecuteCryAsync() { return Task.FromResult(new ToolResult { Success = true, Data = "{\"animation\":\"cry\"}" }); }
-        private Task<ToolResult> ExecuteDanceAsync() { return Task.FromResult(new ToolResult { Success = true, Data = "{\"animation\":\"dance\"}" }); }
-        private Task<ToolResult> ExecuteYawnAsync() { return Task.FromResult(new ToolResult { Success = true, Data = "{\"animation\":\"yawn\"}" }); }
-        private Task<ToolResult> ExecuteBlushAsync() { return Task.FromResult(new ToolResult { Success = true, Data = "{\"animation\":\"blush\"}" }); }
-        private Task<ToolResult> ExecuteStompAsync() { return Task.FromResult(new ToolResult { Success = true, Data = "{\"animation\":\"stomp\"}" }); }
+        // ========== 计时器（已移除，由外部管理） ==========
 
         public Task StartTimerAsync(int seconds, Action onComplete)
         {
-            lock (_timerLock)
-            {
-                StopTimer();
-                _remainingSeconds = seconds;
-                _timerStatus = TimerStatus.Running;
-                _onComplete = onComplete;
-                _timer = new Timer(TimerTick, null, 1000, 1000);
-            }
+            // 计时器功能已从 ToolService 中移除
+            // 由外部 TimerService 或调用方管理
             return Task.CompletedTask;
         }
 
-        public void StopTimer()
-        {
-            lock (_timerLock)
-            {
-                _timer?.Dispose();
-                _timer = null;
-                _remainingSeconds = 0;
-                _timerStatus = TimerStatus.Idle;
-                _onComplete = null;
-            }
-        }
+        public void StopTimer() { }
+        public void TogglePauseTimer() { }
+        public int GetTimerRemaining() => 0;
+        public TimerStatus GetTimerStatus() => TimerStatus.Idle;
 
-        public void TogglePauseTimer()
-        {
-            lock (_timerLock)
-            {
-                if (_timerStatus == TimerStatus.Running) { _timer?.Dispose(); _timer = null; _timerStatus = TimerStatus.Paused; }
-                else if (_timerStatus == TimerStatus.Paused) { _timerStatus = TimerStatus.Running; _timer = new Timer(TimerTick, null, 1000, 1000); }
-            }
-        }
-
-        public int GetTimerRemaining()
-        {
-            lock (_timerLock) { return _remainingSeconds; }
-        }
-
-        public TimerStatus GetTimerStatus()
-        {
-            lock (_timerLock) { return _timerStatus; }
-        }
-
-        private void TimerTick(object? state)
-        {
-            lock (_timerLock)
-            {
-                if (_timerStatus != TimerStatus.Running) return;
-                _remainingSeconds--;
-                if (_remainingSeconds <= 0)
-                {
-                    _timer?.Dispose();
-                    _timer = null;
-                    _timerStatus = TimerStatus.Completed;
-                    var callback = _onComplete;
-                    _onComplete = null;
-                    callback?.Invoke();
-                }
-            }
-        }
+        // ========== 工具功能实现 ==========
 
         public async Task<string> GetRandomComplimentAsync()
         {
             try
             {
                 var template = _formatter.Format(new Dictionary<string, string> { { "type", "compliment" } });
-                // 使用第一个可用的提供商
                 var providers = _llmClient.GetAvailableProviders().ToList();
                 var provider = providers.FirstOrDefault() ?? "default";
                 var result = await _llmClient.SendChatAsync(provider, "gpt-4o-mini", template);
@@ -310,7 +309,6 @@ actions 数组中每个元素的 type 可以是：
 
         public Task<string> PetAsync()
         {
-            // 情绪变化由 LLM 的 mood_change action 处理，这里只返回摸头回应文本
             return Task.FromResult(PetResponses[_random.Next(PetResponses.Length)]);
         }
 
@@ -329,7 +327,6 @@ actions 数组中每个元素的 type 可以是：
 
         public void Dispose()
         {
-            _timer?.Dispose();
             GC.SuppressFinalize(this);
         }
     }
