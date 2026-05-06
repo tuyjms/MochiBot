@@ -23,13 +23,13 @@ public class AgentMoodTracker : IAgentMoodTracker
         var newMood = eventType switch
         {
             "LateNight" or "Sleepy" => AgentMood.Sleepy,
-            "LongWork" or "Tired" => AgentMood.Sleepy,
-            "Idle" => AgentMood.Neutral,
-            "Active" => AgentMood.Happy,
-            "Pet" or "Compliment" => AgentMood.Touched,
+            "LongWork" => AgentMood.Neutral,
+            "Idle" => AgentMood.Sad,
+            "Active" => AgentMood.Neutral,
+            "Pet" => AgentMood.Touched,
+            "Compliment" => AgentMood.Happy,
             "Angry" => AgentMood.Angry,
-            "Sad" => AgentMood.Sad,
-            _ => AgentMood.Neutral
+            _ => CurrentMood
         };
 
         SetMood(newMood);

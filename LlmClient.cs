@@ -17,7 +17,7 @@ public class LlmClient
         var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
         if (!File.Exists(configPath))
         {
-            throw new FileNotFoundException("Configuration file 'appsettings.json' not found.");
+            return new Dictionary<string, ProviderConfig>();
         }
 
         var json = File.ReadAllText(configPath);

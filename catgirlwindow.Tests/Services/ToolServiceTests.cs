@@ -40,7 +40,7 @@ public class ToolServiceTests : IDisposable
     public void GetToolDefinitions_ShouldReturnCorrectCount()
     {
         var tools = _service.GetToolDefinitions();
-        Assert.Equal(5, tools.Count);
+        Assert.Equal(7, tools.Count);
     }
 
     [Fact]

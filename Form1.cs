@@ -13,7 +13,9 @@ public partial class Form1 : Form
         InitializeComponent();
 
         // 初始化 Agent 依赖
-        var configReader = new ConfigReader();
+        var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+        ConfigReader.Initialize(configPath);
+        var configReader = ConfigReader.Instance;
         var shortTermMemory = new ShortTermMemory(50);
         var moodTracker = new AgentMoodTracker();
         var formatter = new PromptFormatter("");

@@ -17,14 +17,19 @@ public class Agent : IAgent
 {
     private readonly LlmClient _llmClient;
     private readonly IConfigReader _configReader;
-    private readonly IPromptFormatter _formatter;
     private readonly IShortTermMemory _shortTermMemory;
     private readonly IMidTermMemory? _midTermMemory;
-    private readonly ILongTermMemory? _longTermMemory;
     private readonly IToolService _toolService;
     private readonly IAgentMoodTracker _moodTracker;
+    private readonly IDatabaseService? _databaseService;
     private readonly AppSettings _appSettings;
     private readonly PersonalityConfig? _personality;
+
+    // 预留依赖注入
+#pragma warning disable CS0169
+    private readonly IPromptFormatter _formatter;
+    private readonly ILongTermMemory? _longTermMemory;
+#pragma warning restore CS0169
 
     private bool _isProcessing;
     private string _lastEvent = string.Empty;
@@ -63,7 +68,8 @@ public class Agent : IAgent
         IToolService toolService,
         IAgentMoodTracker moodTracker,
         IMidTermMemory? midTermMemory = null,
-        ILongTermMemory? longTermMemory = null)
+        ILongTermMemory? longTermMemory = null,
+        IDatabaseService? databaseService = null)
     {
         _llmClient = llmClient ?? throw new ArgumentNullException(nameof(llmClient));
         _configReader = configReader ?? throw new ArgumentNullException(nameof(configReader));
@@ -73,9 +79,13 @@ public class Agent : IAgent
         _longTermMemory = longTermMemory;
         _toolService = toolService ?? throw new ArgumentNullException(nameof(toolService));
         _moodTracker = moodTracker ?? throw new ArgumentNullException(nameof(moodTracker));
+        _databaseService = databaseService;
 
         _appSettings = configReader.GetAppSettings();
         _personality = configReader.GetActivePersonality();
+
+        // 订阅情绪变化事件，记录到数据库
+        _moodTracker.MoodChanged += OnMoodChanged;
     }
 
     // ========== 对话模式 ==========
@@ -124,8 +134,8 @@ public class Agent : IAgent
             // 7. 检查短期记忆是否溢出
             await CheckMemoryOverflowAsync();
 
-            // 8. 更新情绪
-            _moodTracker.UpdateMoodByEvent("Active");
+            // 8. 更新情绪（根据用户交互内容和时间自动判断）
+            DetectAndTriggerMoodEvent(userMessage);
 
             return reply;
         }
@@ -230,14 +240,14 @@ public class Agent : IAgent
         return result.Success ? result.Data : $"错误：{result.Error}";
     }
 
-    public async Task<string> ProcessPluginCallAsync(string pluginName, string parameters)
+    public Task<string> ProcessPluginCallAsync(string pluginName, string parameters)
     {
-        return $"插件 '{pluginName}' 暂未实现";
+        return Task.FromResult($"插件 '{pluginName}' 暂未实现");
     }
 
-    public async Task<string> ProcessMcpCallAsync(string serverName, string toolName, string parameters)
+    public Task<string> ProcessMcpCallAsync(string serverName, string toolName, string parameters)
     {
-        return $"MCP服务器 '{serverName}' 的工具 '{toolName}' 暂未实现";
+        return Task.FromResult($"MCP服务器 '{serverName}' 的工具 '{toolName}' 暂未实现");
     }
 
     // ========== 状态查询 ==========
@@ -262,7 +272,8 @@ public class Agent : IAgent
     {
         var name = _personality?.Name ?? "小琪";
         var personalityDesc = _personality?.Description ?? "温柔可爱，善解人意";
-        var currentMood = _moodTracker.CurrentMood.ToString();
+        var currentMood = _moodTracker.CurrentMood;
+        var moodDesc = GetMoodDescription(currentMood);
 
         // 基础工具描述
         var baseTools = _toolService.GetToolDefinitions();
@@ -279,14 +290,14 @@ public class Agent : IAgent
         {
             { "Name", name },
             { "Personality", personalityDesc },
-            { "CurrentMood", currentMood },
+            { "CurrentMood", $"{currentMood} - {moodDesc}" },
             { "BaseTools", baseToolsDesc },
             { "MoodTools", moodToolsDesc }
         });
     }
 
     /// <summary>构建用户上下文（含短期记忆）</summary>
-    private async Task<string> BuildUserContextAsync(string userMessage)
+    private Task<string> BuildUserContextAsync(string userMessage)
     {
         // 短期记忆
         var recentMessages = _shortTermMemory.GetRecentMessages(10);
@@ -305,7 +316,7 @@ public class Agent : IAgent
             result += $"\n\n{_lastJsonError}";
         }
 
-        return result;
+        return Task.FromResult(result);
     }
 
     /// <summary>调用 LLM 对话模式</summary>
@@ -555,7 +566,7 @@ public class Agent : IAgent
     }
 
     /// <summary>解析关键词 JSON</summary>
-    private (string, string, string) ParseKeywords(string json)
+    private static (string, string, string) ParseKeywords(string json)
     {
         try
         {
@@ -573,7 +584,8 @@ public class Agent : IAgent
     }
 
     /// <summary>简单关键词提取（用于长期记忆检索）</summary>
-    private List<string> ExtractSimpleKeywords(string text)
+#pragma warning disable CS0028
+    private static List<string> ExtractSimpleKeywords(string text)
     {
         var separators = new[] { ' ', '，', '。', '！', '？', '、', '；', '：', '\n', '\r', '\t' };
         return text.Split(separators, StringSplitOptions.RemoveEmptyEntries)
@@ -581,6 +593,64 @@ public class Agent : IAgent
             .Distinct()
             .Take(5)
             .ToList();
+    }
+#pragma warning restore CS0028
+
+    /// <summary>情绪变化事件处理：记录到数据库</summary>
+    private void OnMoodChanged(object? sender, AgentMood mood)
+    {
+        if (_databaseService != null)
+        {
+            _ = _databaseService.LogMoodChangeAsync(mood, _lastEvent);
+        }
+    }
+
+    /// <summary>根据用户消息内容和时间自动检测并触发情绪事件</summary>
+    private void DetectAndTriggerMoodEvent(string userMessage)
+    {
+        var hour = DateTime.Now.Hour;
+        if (hour >= 23 || hour < 6)
+        {
+            _lastEvent = "LateNight";
+            _moodTracker.UpdateMoodByEvent("LateNight");
+            return;
+        }
+
+        var msg = userMessage.ToLowerInvariant();
+
+        if (msg.Contains("摸摸") || msg.Contains("摸头") || msg.Contains("拍头") || msg.Contains("抱抱"))
+        {
+            _lastEvent = "Pet";
+            _moodTracker.UpdateMoodByEvent("Pet");
+            return;
+        }
+
+        if (msg.Contains("夸") || msg.Contains("好看") || msg.Contains("可爱") || msg.Contains("漂亮") ||
+            msg.Contains("喜欢你") || msg.Contains("真棒") || msg.Contains("厉害"))
+        {
+            _lastEvent = "Compliment";
+            _moodTracker.UpdateMoodByEvent("Compliment");
+            return;
+        }
+
+        _lastEvent = "Active";
+        _moodTracker.UpdateMoodByEvent("Active");
+    }
+
+    /// <summary>获取当前情绪的中文描述，用于注入 LLM 系统提示词</summary>
+    private static string GetMoodDescription(AgentMood mood)
+    {
+        return mood switch
+        {
+            AgentMood.Happy => "开心 - 被夸奖或互动后感到愉快，表现活泼亲昵、主动多话、撒娇粘人",
+            AgentMood.Sad => "委屈 - 长时间未被关注感到失落，回复简短小声、流露委屈感",
+            AgentMood.Sleepy => "困倦 - 深夜时段感到困倦，语气慵懒、想睡觉",
+            AgentMood.Touched => "感动 - 被温柔对待后深受感动，语气轻柔内敛、表达感激",
+            AgentMood.Angry => "生气 - 被频繁打扰感到不耐烦，回复极简敷衍、语气消极",
+            AgentMood.Teasing => "调皮 - 调侃互动状态，语气俏皮带点毒舌",
+            AgentMood.Surprised => "惊讶 - 遇到意外情况，语气充满好奇和惊讶",
+            _ => "平静 - 默认状态，温和耐心、主动亲近的正常对话"
+        };
     }
 }
 

@@ -128,7 +128,7 @@ public class ShortTermMemory : IShortTermMemory
         _contextSummary = null;
     }
 
-    public async Task<string> SummarizeAsync()
+    public Task<string> SummarizeAsync()
     {
         // 在实际应用中，这里会调用 LLM 进行总结
         // 当前实现返回占位符，由外部注入实际的 LLM 调用
@@ -162,6 +162,6 @@ public class ShortTermMemory : IShortTermMemory
             AddMessage(msg.Role, msg.Content);
         }
 
-        return summary;
+        return Task.FromResult(summary);
     }
 }

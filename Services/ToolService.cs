@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Threading;
 using catgirlwindow.Models;
 using Timer = System.Threading.Timer;
 
@@ -20,7 +19,7 @@ public class ToolService : IToolService, IDisposable
     private int _remainingSeconds;
     private TimerStatus _timerStatus = TimerStatus.Idle;
     private Action? _onComplete;
-    private readonly object _timerLock = new();
+    private readonly Lock _timerLock = new();
 
     // 本地夸奖语
     private static readonly string[] ComplimentTemplates =
@@ -50,6 +49,36 @@ public class ToolService : IToolService, IDisposable
     // 心情附加工具
     private static readonly Dictionary<AgentMood, ToolDefinition> MoodTools = new()
     {
+        [AgentMood.Sad] = new ToolDefinition
+        {
+            Name = "hug",
+            Description = "拥抱AI女友，她会感到温暖和安慰（当前心情委屈时可用）",
+            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
+        },
+        [AgentMood.Happy] = new ToolDefinition
+        {
+            Name = "dance",
+            Description = "和AI女友一起跳舞，她会更开心（当前心情开心时可用）",
+            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
+        },
+        [AgentMood.Sleepy] = new ToolDefinition
+        {
+            Name = "tuck_in",
+            Description = "哄AI女友睡觉（当前心情困倦时可用）",
+            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
+        },
+        [AgentMood.Touched] = new ToolDefinition
+        {
+            Name = "cuddle",
+            Description = "和感动的AI女友依偎在一起（当前心情感动时可用）",
+            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
+        },
+        [AgentMood.Angry] = new ToolDefinition
+        {
+            Name = "calm_down",
+            Description = "安抚生气的AI女友（当前心情生气时可用）",
+            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
+        }
     };
 
     public ToolService(LlmClient llmClient, IAgentMoodTracker moodTracker, IPromptFormatter formatter)
@@ -77,11 +106,16 @@ public class ToolService : IToolService, IDisposable
                 InputSchema = new Dictionary<string, object> {
                      { "type", "object" }, 
                      { "properties", new Dictionary<string, object>() }, 
-                     { "required", new string[] { } } } },
+                     { "required", Array.Empty<string>() } } },
+            new() { Name = "pet", Description = "摸摸AI女友的头，她会感到开心和感动", 
+                InputSchema = new Dictionary<string, object> {
+                     { "type", "object" }, 
+                     { "properties", new Dictionary<string, object>() }, 
+                     { "required", Array.Empty<string>() } } },
             new() { Name = "weather", Description = "查询指定城市的当前天气和今日天气预报", 
-            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object> { { "city", new Dictionary<string, object> { { "type", "string" }, { "description", "城市名称，为空则自动获取IP所在城市" } } } } }, { "required", new string[] { } } } },
+            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object> { { "city", new Dictionary<string, object> { { "type", "string" }, { "description", "城市名称，为空则自动获取IP所在城市" } } } } }, { "required", Array.Empty<string>() } } },
             new() { Name = "list_plugins", Description = "列出所有已加载的JS插件和MCP服务器工具及其描述", 
-            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", new string[] { } } } },
+            InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } } },
             new() { Name = "reply", Description = "回复用户说的话。如果不调用此工具，则表示不回复（保持沉默）。调用此工具时，reply_text 参数为你要说的话",
             InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object> { { "reply_text", new Dictionary<string, object> { { "type", "string" }, { "description", "你要对用户说的话" } } } } }, { "required", new[] { "reply_text" } } } }
         };
@@ -293,5 +327,6 @@ actions 数组中每个元素的 type 可以是：
     public void Dispose()
     {
         _timer?.Dispose();
+        GC.SuppressFinalize(this);
     }
 }
