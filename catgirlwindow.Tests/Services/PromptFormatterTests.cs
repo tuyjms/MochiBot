@@ -1,5 +1,4 @@
-using catgirlwindow.Src.Services;
-
+using catgirlwindow.Src.Agent;
 namespace catgirlwindow.SrcTests;
 
 public class PromptFormatterTests

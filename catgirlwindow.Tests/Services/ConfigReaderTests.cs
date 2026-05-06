@@ -1,6 +1,4 @@
-using catgirlwindow.Src.Services.Config;
-using catgirlwindow.Src.Services.Config.Models;
-
+using catgirlwindow.Src.Core.Config;
 namespace catgirlwindow.SrcTests;
 
 public class ConfigReaderTests : IDisposable

@@ -1,6 +1,6 @@
-using catgirlwindow.SrcModels;
-using catgirlwindow.Src.Services;
-
+using catgirlwindow.Src.Core.Database;
+using catgirlwindow.Src.Core.Models;
+using catgirlwindow.Src.Models;
 namespace catgirlwindow.SrcTests;
 
 public class DatabaseServiceTests : IDisposable
