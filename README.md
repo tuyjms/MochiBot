@@ -26,4 +26,8 @@ dotnet test
 
 ## 贡献指南
 
-请参阅 [doc/00 - 写给viber的话.md](doc/00%20-%20%E5%86%99%E7%BB%99viber%E7%9A%84%E8%AF%9D.md) 了解协作规范。
+请参阅 [doc/00 - 写给viber的话.md](doc/00%20-%20写给viber的话.md) 了解协作规范。
+
+## feature
+
+参考[doc\00 - 工作安排.md](doc/00%20-%20工作安排.md)
