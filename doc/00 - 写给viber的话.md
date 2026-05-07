@@ -14,7 +14,7 @@
 
 | 程度词 | 含义 | 示例 |
 |--------|------|------|
-| 重构改动 | 代码结构重组，功能不变 | `重构改动：重命名测试项目 catgirlwindow.Tests 为 MochiBot.Tests` |
+| 重构改动 | 代码结构重组，功能不变 | `重构改动：重命名测试项目 Mochi.Tests 为 MochiBot.Tests` |
 | 兼容性改动 | 影响接口/配置/依赖的变更 | `兼容性改动：重构项目为WDF` |
 | 优化改动 | 性能优化或代码精简 | `优化改动：去掉了不需要的逻辑` |
 | 功能改动 | 新增或修改功能 | `功能改动：添加天气查询模块` |
@@ -30,10 +30,10 @@
 
 ## 模块结构
 
-如果模块包含多个文件，在 `Services/` 目录下创建模块文件夹存放相关文件。例如：
+如果模块包含多个文件，在目录下创建模块文件夹存放相关文件。例如：
 
 ```txt
-Services/
+工作目录/
 ├── DatabaseService.cs          # 单文件模块
 ├── MoodModule/                 # 多文件模块示例
 │   ├── MoodRecorder.cs
@@ -53,7 +53,7 @@ Services/
 3. **实现代码**：在 `ConfigReader.cs` 中添加对应的属性或方法
 4. **更新文档**：同步更新 `doc/01-项目架构总览.md` 和 `doc/11-接口调用关系与协作图.md`
 
-> 禁止在各模块中直接硬编码配置参数，所有配置必须走 ConfigReader 统一流程。
+> 禁止在各模块中直接硬编码配置参数，所有软件配置必须走 ConfigReader 统一流程。
 
 ## 日志规范
 
@@ -77,17 +77,15 @@ Services/
 **Agent 核心协调层** 不需要编写单元测试。原因如下：
 
 - Agent 不是独立的功能模块，而是 LLM 操作模块的"操作系统"
-- Agent 的核心逻辑是协调和调度其他模块，其正确性依赖于各子模块的正确性
-- Agent 的测试需要完整的 LLM 调用链，单元测试无法覆盖真实场景
 - Agent 的正确性通过整体集成测试来验证
 
 ### 测试项目结构
 
-测试项目位于 `catgirlwindow.Tests/` 目录下，使用 xUnit 框架 + SQLite 文件数据库（每个测试用例独立文件，自动清理）。测试文件按服务类别分文件夹存放。
+测试项目位于 `Mochi.Tests/` 目录下，使用 xUnit 框架 + SQLite 文件数据库（每个测试用例独立文件，自动清理）。测试文件按服务类别分文件夹存放。
 
 ```txt
-catgirlwindow.Tests/
-├── catgirlwindow.SrcTests.csproj    # 测试项目配置
+Mochi.Tests/
+├── Mochi.SrcTests.csproj    # 测试项目配置
 ├── Services/                     # 服务层测试
 │   ├── DatabaseServiceTests.cs   # 数据库业务层测试
 │   └── ConfigReaderTests.cs      # 配置读取器测试
@@ -98,16 +96,16 @@ catgirlwindow.Tests/
 
 ```bash
 # 运行所有测试
-dotnet test catgirlwindow.SrcTests/catgirlwindow.Tests.csproj
+dotnet test Mochi.SrcTests/Mochi.Tests.csproj
 
 # 运行指定测试类（按名称筛选）
-dotnet test catgirlwindow.SrcTests/catgirlwindow.Tests.csproj --filter "FullyQualifiedName~DatabaseServiceTests"
+dotnet test Mochi.SrcTests/Mochi.Tests.csproj --filter "FullyQualifiedName~DatabaseServiceTests"
 ```
 
 ### 编写测试的注意事项
 
-1. **测试项目引用主项目**：`catgirlwindow.Tests.csproj` 已通过 `<ProjectReference>` 引用主项目，可直接使用主项目的类和接口
-2. **主项目排除测试文件**：`catgirlwindow.csproj` 中已添加 `<Compile Remove="catgirlwindow.Tests\**\*.cs" />`，避免主项目编译时误编译测试文件
+1. **测试项目引用主项目**：`Mochi.Tests.csproj` 已通过 `<ProjectReference>` 引用主项目，可直接使用主项目的类和接口
+2. **主项目排除测试文件**：`Mochi.csproj` 中已添加 `<Compile Remove="Mochi.Tests\**\*.cs" />`，避免主项目编译时误编译测试文件
 3. **SQLite 连接池**：测试连接字符串需添加 `Pooling=False`，确保每个测试用例的数据库文件可被正确清理
 4. **文件清理**：`Dispose()` 中使用 `try/catch` 包裹文件删除，避免因文件锁定导致测试失败
 5. **独立数据库文件**：每个测试用例使用 `Guid.NewGuid()` 生成唯一文件名，避免并行测试冲突

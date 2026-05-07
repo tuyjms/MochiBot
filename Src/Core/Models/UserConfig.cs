@@ -5,7 +5,7 @@
     /// </summary>
     public class UserConfig
     {
-        /// <summary>AI女友的名字</summary>
+        /// <summary>AI桌宠的名字</summary>
         public string Name { get; set; } = "小可爱";
 
         /// <summary>性格：温柔 / 毒舌 / 活泼</summary>

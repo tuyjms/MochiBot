@@ -52,7 +52,7 @@ public class DatabaseServiceTests : IDisposable
     {
         var config = new UserConfig
         {
-            Name = "测试女友",
+            Name = "测试",
             Personality = "活泼",
             Opacity = 0.8,
             MurmurEnabled = false,

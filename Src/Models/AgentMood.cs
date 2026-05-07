@@ -1,7 +1,7 @@
 ﻿namespace MochiBot.Src.Models
 {
     /// <summary>
-    /// AI女友情绪状态枚举
+    /// AI桌宠情绪状态枚举
     /// </summary>
     public enum AgentMood
     {

@@ -32,8 +32,6 @@ namespace MochiBot.Src.Agent
 
         // ========== 心情记录器（集成到 Agent 内部） ==========
         private AgentMood _currentMood = AgentMood.Neutral;
-        /// <summary>情绪变化时触发的事件（UI订阅以更新头像）</summary>
-        public event EventHandler<AgentMood>? MoodChanged;
 
         private readonly ActionExecutor _actionExecutor;
         private readonly PromptFormatter _systemPromptFormatter;
@@ -44,23 +42,20 @@ namespace MochiBot.Src.Agent
 
         // 对话模式 System Prompt 模板
         private const string SystemPromptTemplate = @"
-你是一个名叫{Name}的AI女友，你的性格是{Personality}。
-你的主人（用户）叫{UserName}，请用这个名字称呼他/她。
+你是一个名叫{Name}，你的性格是{Personality}。
+你的主人（用户）叫{UserName}，请用这个名字称呼。
 【当前情绪】{CurrentMood}
 
-【可用工具】
-{BaseTools}
+【可用工具】{BaseTools}
 
-【心情附加工具（当前情绪可用）】
-{MoodTools}
+【心情附加工具（当前情绪可用）】{MoodTools}
 
 {FormatInstruction}
 ";
 
         // 对话模式用户上下文模板
         private const string UserContextTemplate = @"
-【短期记忆】
-{ShortTermMemory}
+【短期记忆】{ShortTermMemory}
 
 用户说：{UserMessage}
 
@@ -87,7 +82,7 @@ namespace MochiBot.Src.Agent
             // 创建 ActionExecutor，将 actions 执行逻辑委托给它
             _actionExecutor = new ActionExecutor(
                 _toolService,
-                mood => SetMood(mood),
+                mood => ChangeMoodByEvent(mood.ToString()),
                 (desc, param) => _shortTermMemory.AddMessage("system", $"[中期记忆] {desc}"),
                 anim => _lastEvent = $"animation:{anim}");
 
@@ -121,7 +116,7 @@ namespace MochiBot.Src.Agent
                         if (uiType == "pet")
                         {
                             _lastEvent = "Pet";
-                            UpdateMoodByEvent("Pet");
+                            ChangeMoodByEvent("Pet");
                         }
                     }
                 }
@@ -130,27 +125,13 @@ namespace MochiBot.Src.Agent
             _subscriptionIds.Add(uiSubId);
         }
 
-        // ========== 心情记录器方法（集成到 Agent 内部） ==========
+        // ========== 心情记录器（集成到 Agent 内部） ==========
 
         /// <summary>获取当前情绪</summary>
         public AgentMood CurrentMood => _currentMood;
 
-        /// <summary>手动设置情绪（外部触发，如摸摸她）</summary>
-        public void SetMood(AgentMood mood)
-        {
-            if (_currentMood == mood) return;
-            _currentMood = mood;
-            MoodChanged?.Invoke(this, mood);
-
-            // 记录到数据库
-            if (_databaseService != null)
-            {
-                _ = _databaseService.LogMoodChangeAsync(mood, _lastEvent);
-            }
-        }
-
-        /// <summary>根据系统事件自动切换情绪</summary>
-        public void UpdateMoodByEvent(string eventType)
+        /// <summary>根据事件类型切换心情，并通过事件调度器发布 MoodChange 事件</summary>
+        private void ChangeMoodByEvent(string eventType)
         {
             var newMood = eventType switch
             {
@@ -164,7 +145,26 @@ namespace MochiBot.Src.Agent
                 _ => _currentMood
             };
 
-            SetMood(newMood);
+            if (_currentMood == newMood) return;
+            _currentMood = newMood;
+
+            // 通过事件调度器发布情绪变化事件
+            _eventDispatcher.Publish(new EventData
+            {
+                Category = EventCategory.MoodChange,
+                Trigger = EventTrigger.System,
+                Info = JsonSerializer.Serialize(new
+                {
+                    mood = newMood.ToString(),
+                    source = eventType
+                })
+            });
+
+            // 记录到数据库
+            if (_databaseService != null)
+            {
+                _ = _databaseService.LogMoodChangeAsync(newMood, eventType);
+            }
         }
 
         private readonly Random _random = new();
@@ -536,7 +536,7 @@ namespace MochiBot.Src.Agent
             if (hour >= 23 || hour < 6)
             {
                 _lastEvent = "LateNight";
-                UpdateMoodByEvent("LateNight");
+                ChangeMoodByEvent("LateNight");
                 return;
             }
 
@@ -545,7 +545,7 @@ namespace MochiBot.Src.Agent
             if (msg.Contains("摸摸") || msg.Contains("摸头") || msg.Contains("拍头") || msg.Contains("抱抱"))
             {
                 _lastEvent = "Pet";
-                UpdateMoodByEvent("Pet");
+                ChangeMoodByEvent("Pet");
                 return;
             }
 
@@ -553,12 +553,12 @@ namespace MochiBot.Src.Agent
                 msg.Contains("喜欢你") || msg.Contains("真棒") || msg.Contains("厉害"))
             {
                 _lastEvent = "Compliment";
-                UpdateMoodByEvent("Compliment");
+                ChangeMoodByEvent("Compliment");
                 return;
             }
 
             _lastEvent = "Active";
-            UpdateMoodByEvent("Active");
+            ChangeMoodByEvent("Active");
         }
     }
 

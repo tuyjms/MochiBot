@@ -27,12 +27,6 @@ namespace MochiBot.Src.Agent
         /// <summary>获取当前情绪</summary>
         AgentMood CurrentMood { get; }
 
-        /// <summary>情绪变化时触发的事件（UI订阅以更新头像）</summary>
-        event EventHandler<AgentMood>? MoodChanged;
-
-        /// <summary>根据系统事件自动切换情绪</summary>
-        void UpdateMoodByEvent(string eventType);
-
         // ========== 统一事件处理 ==========
 
         /// <summary>处理事件（用户输入、系统自动事件等统一入口）</summary>
