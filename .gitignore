@@ -88,3 +88,4 @@ Resources/Data/*.json
 Resources/Data/*.db
 Resources/Data/*.db-shm
 Resources/Data/*.db-wal
+Resources/**.txt

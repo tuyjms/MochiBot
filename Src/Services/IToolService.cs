@@ -46,18 +46,21 @@ namespace MochiBot.Src.Services
 
     /// <summary>
     /// 工具调度器接口
-    /// 统一管理基础工具、心情特色工具、JS插件工具、MCP工具
+    /// 统一管理基础工具、心情特色工具、DLLMOD插件、MCP工具
     /// </summary>
     public interface IToolService
     {
         /// <summary>获取所有已注册的基础工具定义（供LLM理解可用工具）</summary>
         List<ToolDefinition> GetToolDefinitions();
 
+        /// <summary>获取工具调用格式说明（供 LLM 理解 actions 返回格式）</summary>
+        string GetFormatInstruction();
+
         /// <summary>根据当前情绪获取附加工具定义</summary>
         /// <param name="currentMood">当前情绪</param>
         List<ToolDefinition> GetMoodBasedTools(AgentMood currentMood);
 
-        /// <summary>列出所有已加载的JS插件及其描述（供LLM通过 list_plugins 调用）</summary>
+        /// <summary>列出所有已加载的DLLMOD插件及其描述（供LLM通过 list_plugins 调用）</summary>
         Task<List<ToolDefinition>> ListPluginsAsync();
 
         /// <summary>列出所有已注册的MCP服务器工具（供LLM通过 list_plugins 调用）</summary>
@@ -68,9 +71,9 @@ namespace MochiBot.Src.Services
         /// <param name="parameters">参数（JSON字符串）</param>
         Task<ToolResult> ExecuteToolAsync(string toolName, string parameters);
 
-        /// <summary>加载JS插件</summary>
-        /// <param name="pluginDirectory">插件目录</param>
-        Task LoadPluginsAsync(string pluginDirectory);
+        /// <summary>加载DLLMOD插件</summary>
+        /// <param name="modDirectory">插件目录</param>
+        Task LoadModsAsync(string modDirectory);
 
         // ========== 计时器 ==========
 
@@ -91,24 +94,5 @@ namespace MochiBot.Src.Services
         /// <summary>获取计时器状态</summary>
         TimerStatus GetTimerStatus();
 
-
-        // ========== 随机夸奖 ==========
-
-        /// <summary>获取一句随机夸奖</summary>
-        Task<string> GetRandomComplimentAsync();
-
-
-        // ========== 摸摸她 ==========
-
-        /// <summary>执行摸摸头交互</summary>
-        /// <returns>返回摸头动画标识 + 情绪变化结果</returns>
-        Task<string> PetAsync();
-
-
-        // ========== 天气预报 ==========
-
-        /// <summary>查询指定城市的天气</summary>
-        /// <param name="city">城市名称，为空则自动获取IP所在城市</param>
-        Task<WeatherInfo> GetWeatherAsync(string city = "");
     }
 }

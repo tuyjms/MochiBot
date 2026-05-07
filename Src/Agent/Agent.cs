@@ -21,7 +21,6 @@ namespace MochiBot.Src.Agent
     {
         private readonly IEventDispatcher _eventDispatcher;
         private readonly LlmClient _llmClient;
-        private readonly IConfigReader _configReader;
         private readonly IShortTermMemory _shortTermMemory;
         private readonly IToolService _toolService;
         private readonly IDatabaseService? _databaseService;
@@ -55,8 +54,7 @@ namespace MochiBot.Src.Agent
 【心情附加工具（当前情绪可用）】
 {MoodTools}
 
-【插件查询】
-你可以调用 list_plugins 工具获取已加载的JS插件列表，然后通过 plugin_call 执行。
+{FormatInstruction}
 ";
 
         // 对话模式用户上下文模板
@@ -73,14 +71,12 @@ namespace MochiBot.Src.Agent
             IEventDispatcher eventDispatcher,
             LlmClient llmClient,
             IConfigReader configReader,
-            IPromptFormatter formatter,
             IShortTermMemory shortTermMemory,
             IToolService toolService,
             IDatabaseService? databaseService = null)
         {
             _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
             _llmClient = llmClient ?? throw new ArgumentNullException(nameof(llmClient));
-            _configReader = configReader ?? throw new ArgumentNullException(nameof(configReader));
             _shortTermMemory = shortTermMemory ?? throw new ArgumentNullException(nameof(shortTermMemory));
             _toolService = toolService ?? throw new ArgumentNullException(nameof(toolService));
             _databaseService = databaseService;
@@ -401,6 +397,9 @@ namespace MochiBot.Src.Agent
             var moodToolsDesc = string.Join("\n", moodTools.Select(t =>
                 $"- {t.Name}: {t.Description} (参数: {JsonSerializer.Serialize(t.InputSchema)})"));
 
+            // 工具调用格式说明
+            var formatInstruction = _toolService.GetFormatInstruction();
+
             return _systemPromptFormatter.Format(new Dictionary<string, string>
             {
                 { "Name", name },
@@ -408,7 +407,8 @@ namespace MochiBot.Src.Agent
                 { "UserName", userName },
                 { "CurrentMood", $"{_currentMood}" },
                 { "BaseTools", baseToolsDesc },
-                { "MoodTools", moodToolsDesc }
+                { "MoodTools", moodToolsDesc },
+                { "FormatInstruction", formatInstruction }
             });
         }
 
