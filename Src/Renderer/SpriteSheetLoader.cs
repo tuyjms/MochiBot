@@ -1,7 +1,8 @@
+﻿using System.IO;
 using System.Drawing;
 using System.Text.Json;
 
-namespace catgirlwindow.Src.Renderer
+namespace MochiBot.Src.Renderer
 {
     /// <summary>
     /// 精灵图配置模型

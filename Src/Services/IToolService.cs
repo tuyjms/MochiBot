@@ -1,7 +1,7 @@
-using catgirlwindow.Src.Core.Models;
-using catgirlwindow.Src.Models;
+﻿using MochiBot.Src.Core.Models;
+using MochiBot.Src.Models;
 
-namespace catgirlwindow.Src.Services
+namespace MochiBot.Src.Services
 {
     /// <summary>
     /// 工具定义，按 MCP 标准描述工具信息

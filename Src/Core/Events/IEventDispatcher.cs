@@ -1,6 +1,6 @@
-using catgirlwindow.Src.Models;
+﻿using MochiBot.Src.Models;
 
-namespace catgirlwindow.Src.Core.Events
+namespace MochiBot.Src.Core.Events
 {
     /// <summary>
     /// 定时任务定义

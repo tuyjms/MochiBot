@@ -1,7 +1,7 @@
-using System.Text.Json;
-using catgirlwindow.Src.Models;
+﻿using System.Text.Json;
+using MochiBot.Src.Models;
 
-namespace catgirlwindow.Src.Core.Events
+namespace MochiBot.Src.Core.Events
 {
     /// <summary>
     /// 内置任务处理器

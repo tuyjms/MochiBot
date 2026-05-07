@@ -1,5 +1,5 @@
-using catgirlwindow.Src.Core.Config;
-namespace catgirlwindow.Tests;
+﻿using MochiBot.Src.Core.Config;
+namespace MochiBot.Tests;
 
 public class ConfigReaderTests : IDisposable
 {

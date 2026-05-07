@@ -1,8 +1,9 @@
+﻿using System.IO;
 using Microsoft.Data.Sqlite;
-using catgirlwindow.Src.Core.Models;
-using catgirlwindow.Src.Models;
+using MochiBot.Src.Core.Models;
+using MochiBot.Src.Models;
 
-namespace catgirlwindow.Src.Core.Database
+namespace MochiBot.Src.Core.Database
 {
     /// <summary>
     /// 数据库业务层实现 - 基于 SQLite

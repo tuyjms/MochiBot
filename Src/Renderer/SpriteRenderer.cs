@@ -1,7 +1,9 @@
-using System.Drawing;
+﻿using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
+using System.Timers;
 
-namespace catgirlwindow.Src.Renderer
+namespace MochiBot.Src.Renderer
 {
     /// <summary>
     /// 动画播放状态
@@ -21,7 +23,7 @@ namespace catgirlwindow.Src.Renderer
         private SpriteSheetLoader? _spriteLoader;
         private Image? _gifImage;
         private Image? _currentFrame;
-        private System.Windows.Forms.Timer? _timer;
+        private System.Timers.Timer? _timer;
         private int _currentFrameIndex;
         private AnimationState _state = AnimationState.Stopped;
         private SpriteSheetConfig? _config;
@@ -190,16 +192,23 @@ namespace catgirlwindow.Src.Renderer
         /// </summary>
         private void UpdateCurrentFrame()
         {
+            Image? rawFrame = null;
+
             if (_isGif && _gifImage != null)
             {
                 _gifImage.SelectActiveFrame(new FrameDimension(_gifGuid), _currentFrameIndex);
-                _currentFrame?.Dispose();
-                _currentFrame = new Bitmap(_gifImage);
+                rawFrame = new Bitmap(_gifImage);
             }
             else if (_spriteLoader != null)
             {
+                rawFrame = _spriteLoader.GetFrame(_currentFrameIndex);
+            }
+
+            if (rawFrame != null)
+            {
+                // 直接使用原始帧，保留 PNG 透明通道
                 _currentFrame?.Dispose();
-                _currentFrame = _spriteLoader.GetFrame(_currentFrameIndex);
+                _currentFrame = rawFrame;
             }
         }
 
@@ -264,11 +273,11 @@ namespace catgirlwindow.Src.Renderer
             if (_config == null) return;
 
             var interval = 1000 / _config.Fps;
-            _timer = new System.Windows.Forms.Timer
+            _timer = new System.Timers.Timer(Math.Max(interval, 16)) // 最小 16ms (~60fps)
             {
-                Interval = Math.Max(interval, 16) // 最小 16ms (~60fps)
+                AutoReset = true
             };
-            _timer.Tick += OnTimerTick;
+            _timer.Elapsed += OnTimerTick;
             _timer.Start();
         }
 
@@ -280,13 +289,13 @@ namespace catgirlwindow.Src.Renderer
             if (_timer != null)
             {
                 _timer.Stop();
-                _timer.Tick -= OnTimerTick;
+                _timer.Elapsed -= OnTimerTick;
                 _timer.Dispose();
                 _timer = null;
             }
         }
 
-        private void OnTimerTick(object? sender, EventArgs e)
+        private void OnTimerTick(object? sender, ElapsedEventArgs e)
         {
             if (_config == null || _state != AnimationState.Playing)
                 return;

@@ -1,4 +1,4 @@
-namespace catgirlwindow.Src.Core.Models
+﻿namespace MochiBot.Src.Core.Models
 {
     /// <summary>
     /// 用户配置模型

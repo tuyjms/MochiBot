@@ -1,4 +1,4 @@
-namespace catgirlwindow.Src.Core.Models
+﻿namespace MochiBot.Src.Core.Models
 {
     /// <summary>
     /// 天气信息模型

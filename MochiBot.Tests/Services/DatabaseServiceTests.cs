@@ -1,7 +1,7 @@
-using catgirlwindow.Src.Core.Database;
-using catgirlwindow.Src.Core.Models;
-using catgirlwindow.Src.Models;
-namespace catgirlwindow.Tests;
+﻿using MochiBot.Src.Core.Database;
+using MochiBot.Src.Core.Models;
+using MochiBot.Src.Models;
+namespace MochiBot.Tests;
 
 public class DatabaseServiceTests : IDisposable
 {

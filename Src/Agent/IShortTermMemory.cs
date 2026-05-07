@@ -1,6 +1,6 @@
-using catgirlwindow.Src.Models;
+﻿using MochiBot.Src.Models;
 
-namespace catgirlwindow.Src.Agent
+namespace MochiBot.Src.Agent
 {
     /// <summary>
     /// 超上下文处理策略

@@ -1,17 +1,17 @@
-using System.Text.Json;
-using catgirlwindow.Src.Core.Config;
-using catgirlwindow.Src.Core.Config.Models;
-using catgirlwindow.Src.Core.Database;
-using catgirlwindow.Src.Core.Events;
-using catgirlwindow.Src.Models;
-using catgirlwindow.Src.Services.Tool;
-using catgirlwindow.Src.Services;
+﻿using System.Text.Json;
+using MochiBot.Src.Core.Config;
+using MochiBot.Src.Core.Config.Models;
+using MochiBot.Src.Core.Database;
+using MochiBot.Src.Core.Events;
+using MochiBot.Src.Models;
+using MochiBot.Src.Services.Tool;
+using MochiBot.Src.Services;
 using OpenAiChatMessage = OpenAI.Chat.ChatMessage;
 using OpenAiSystemChatMessage = OpenAI.Chat.SystemChatMessage;
 using OpenAiUserChatMessage = OpenAI.Chat.UserChatMessage;
 using OpenAiAssistantChatMessage = OpenAI.Chat.AssistantChatMessage;
 
-namespace catgirlwindow.Src.Agent
+namespace MochiBot.Src.Agent
 {
     /// <summary>
     /// Agent 核心协调层实现

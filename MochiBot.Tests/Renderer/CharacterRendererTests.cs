@@ -1,7 +1,7 @@
-using catgirlwindow.Src.Models;
-using catgirlwindow.Src.Renderer;
+﻿using MochiBot.Src.Models;
+using MochiBot.Src.Renderer;
 
-namespace catgirlwindow.Tests.Renderer
+namespace MochiBot.Tests.Renderer
 {
     public class CharacterRendererTests
     {
@@ -14,7 +14,7 @@ namespace catgirlwindow.Tests.Renderer
                 var parent = Directory.GetParent(rootDir);
                 if (parent == null) break;
                 rootDir = parent.FullName;
-                if (File.Exists(Path.Combine(rootDir, "catgirlwindow.sln")))
+                if (File.Exists(Path.Combine(rootDir, "MochiBot.sln")))
                     break;
             }
             return Path.Combine(rootDir, "Resources", "Images");

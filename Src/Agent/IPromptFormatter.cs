@@ -1,4 +1,4 @@
-namespace catgirlwindow.Src.Agent
+﻿namespace MochiBot.Src.Agent
 {
     /// <summary>
     /// Prompt格式化器接口

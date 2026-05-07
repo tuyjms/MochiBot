@@ -1,4 +1,4 @@
-namespace catgirlwindow.Src.Core.Config
+﻿namespace MochiBot.Src.Core.Config
 {
     /// <summary>
     /// 日志记录器接口

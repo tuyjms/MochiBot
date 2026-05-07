@@ -1,5 +1,5 @@
-using catgirlwindow.Src.Agent;
-namespace catgirlwindow.Tests;
+﻿using MochiBot.Src.Agent;
+namespace MochiBot.Tests;
 
 public class PromptFormatterTests
 {

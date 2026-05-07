@@ -1,6 +1,6 @@
-using catgirlwindow.Src.Models;
+﻿using MochiBot.Src.Models;
 
-namespace catgirlwindow.Src.Agent
+namespace MochiBot.Src.Agent
 {
     /// <summary>
     /// 短期记忆 - 环形缓冲区实现，固定容量，自动淘汰旧记录

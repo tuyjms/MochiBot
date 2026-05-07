@@ -1,10 +1,10 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Timers;
-using catgirlwindow.Src.Models;
+using MochiBot.Src.Models;
 using Timer = System.Timers.Timer;
 
-namespace catgirlwindow.Src.Core.Events
+namespace MochiBot.Src.Core.Events
 {
     /// <summary>
     /// 事件调度器实现

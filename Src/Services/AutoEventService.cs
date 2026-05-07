@@ -1,10 +1,10 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Timers;
-using catgirlwindow.Src.Core.Events;
-using catgirlwindow.Src.Models;
+using MochiBot.Src.Core.Events;
+using MochiBot.Src.Models;
 using Timer = System.Timers.Timer;
 
-namespace catgirlwindow.Src.Services
+namespace MochiBot.Src.Services
 {
     /// <summary>
     /// 自动事件服务 - 通用定时任务调度器 + 三个内置特殊事件

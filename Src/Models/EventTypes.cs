@@ -1,4 +1,4 @@
-namespace catgirlwindow.Src.Models
+﻿namespace MochiBot.Src.Models
 {
     /// <summary>
     /// 事件分类枚举

@@ -1,6 +1,6 @@
-using catgirlwindow.Src.Core.Config;
+﻿using MochiBot.Src.Core.Config;
 
-namespace catgirlwindow.Src.Core.Events
+namespace MochiBot.Src.Core.Events
 {
     /// <summary>
     /// 内置任务初始化器

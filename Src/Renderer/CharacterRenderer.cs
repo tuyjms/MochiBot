@@ -1,6 +1,8 @@
-using catgirlwindow.Src.Models;
+﻿using System.Drawing;
+using System.IO;
+using MochiBot.Src.Models;
 
-namespace catgirlwindow.Src.Renderer
+namespace MochiBot.Src.Renderer
 {
     /// <summary>
     /// 角色动画渲染器状态机 - 实现 ICharacterRenderer 接口

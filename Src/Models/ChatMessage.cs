@@ -1,4 +1,4 @@
-namespace catgirlwindow.Src.Models
+﻿namespace MochiBot.Src.Models
 {
     /// <summary>
     /// 对话消息模型

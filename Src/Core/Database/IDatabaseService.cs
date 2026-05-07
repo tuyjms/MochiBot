@@ -1,7 +1,7 @@
-using catgirlwindow.Src.Core.Models;
-using catgirlwindow.Src.Models;
+﻿using MochiBot.Src.Core.Models;
+using MochiBot.Src.Models;
 
-namespace catgirlwindow.Src.Core.Database
+namespace MochiBot.Src.Core.Database
 {
     /// <summary>
     /// 数据库服务接口

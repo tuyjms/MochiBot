@@ -1,9 +1,10 @@
+﻿using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using catgirlwindow.Src.Core.Config.Models;
-using catgirlwindow.Src.Core.Events;
+using MochiBot.Src.Core.Config.Models;
+using MochiBot.Src.Core.Events;
 
-namespace catgirlwindow.Src.Core.Config
+namespace MochiBot.Src.Core.Config
 {
     /// <summary>
     /// 配置读取器实现（单例模式）

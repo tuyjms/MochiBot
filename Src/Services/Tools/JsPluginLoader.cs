@@ -1,6 +1,7 @@
+﻿using System.IO;
 using System.Text.Json;
 
-namespace catgirlwindow.Src.Services.Tool
+namespace MochiBot.Src.Services.Tool
 {
     /// <summary>
     /// JS插件加载器实现

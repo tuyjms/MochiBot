@@ -1,4 +1,4 @@
-namespace catgirlwindow.Src.Core.Config.Models
+﻿namespace MochiBot.Src.Core.Config.Models
 {
     /// <summary>
     /// 人格配置根模型（对应 {人物名称}_person.json）

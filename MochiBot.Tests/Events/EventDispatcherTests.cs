@@ -1,7 +1,7 @@
-using catgirlwindow.Src.Core.Events;
-using catgirlwindow.Src.Models;
+﻿using MochiBot.Src.Core.Events;
+using MochiBot.Src.Models;
 
-namespace catgirlwindow.Tests;
+namespace MochiBot.Tests;
 
 public class EventDispatcherTests : IDisposable
 {

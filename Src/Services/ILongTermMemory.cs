@@ -1,4 +1,4 @@
-namespace catgirlwindow.Src.Services
+﻿namespace MochiBot.Src.Services
 {
     /// <summary>
     /// 长期记忆条目

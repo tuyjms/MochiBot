@@ -1,4 +1,4 @@
-namespace catgirlwindow.Src.Services
+﻿namespace MochiBot.Src.Services
 {
     /// <summary>
     /// 定时任务定义

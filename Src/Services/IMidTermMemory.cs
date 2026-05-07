@@ -1,6 +1,6 @@
-using catgirlwindow.Src.Models;
+﻿using MochiBot.Src.Models;
 
-namespace catgirlwindow.Src.Services
+namespace MochiBot.Src.Services
 {
     /// <summary>
     /// 中期记忆条目

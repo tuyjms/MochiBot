@@ -1,8 +1,8 @@
-using System.Text.Json;
-using catgirlwindow.Src.Core.Config.Models;
+﻿using System.Text.Json;
+using System.IO;
 using OpenAI.Chat;
 
-namespace catgirlwindow.Src.Services
+namespace MochiBot.Src.Services
 {
     public class LlmClient
     {

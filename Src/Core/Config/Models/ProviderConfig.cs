@@ -1,4 +1,4 @@
-namespace catgirlwindow.Src.Core.Config.Models
+﻿namespace MochiBot.Src.Core.Config.Models
 {
     /// <summary>
     /// LLM提供商配置

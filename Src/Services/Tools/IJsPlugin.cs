@@ -1,4 +1,4 @@
-namespace catgirlwindow.Src.Services.Tool
+﻿namespace MochiBot.Src.Services.Tool
 {
     /// <summary>
     /// JS插件接口（由JS脚本实现）
