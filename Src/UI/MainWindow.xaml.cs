@@ -154,26 +154,25 @@ namespace MochiBot.Src.UI
 
         private void OnFrameUpdated()
         {
-            Dispatcher.Invoke(() => UpdateImage());
+            // DispatcherTimer 已在 UI 线程上运行，直接触发刷新
+            UpdateImage();
         }
 
         private void UpdateImage()
         {
-            var frame = _renderer.CurrentFrame;
-            if (frame != null)
+            var frameBytes = _renderer.CurrentFrame;
+            if (frameBytes != null)
             {
-                using (var ms = new MemoryStream())
+                var bitmap = new BitmapImage();
+                using (var ms = new MemoryStream(frameBytes))
                 {
-                    frame.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-                    ms.Position = 0;
-                    var bitmap = new BitmapImage();
                     bitmap.BeginInit();
                     bitmap.CacheOption = BitmapCacheOption.OnLoad;
                     bitmap.StreamSource = ms;
                     bitmap.EndInit();
-                    bitmap.Freeze();
-                    characterImage.Source = bitmap;
                 }
+                bitmap.Freeze();
+                characterImage.Source = bitmap;
             }
         }
 

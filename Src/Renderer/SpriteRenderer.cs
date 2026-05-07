@@ -23,6 +23,8 @@ namespace MochiBot.Src.Renderer
         private SpriteSheetLoader? _spriteLoader;
         private Image? _gifImage;
         private Image? _currentFrame;
+        private byte[]? _currentFrameBytes;
+        private readonly object _frameLock = new();
         private System.Timers.Timer? _timer;
         private int _currentFrameIndex;
         private AnimationState _state = AnimationState.Stopped;
@@ -42,8 +44,17 @@ namespace MochiBot.Src.Renderer
         /// <summary>总帧数</summary>
         public int TotalFrames => _config?.TotalFrames ?? 1;
 
-        /// <summary>当前帧图像</summary>
-        public Image? CurrentFrame => _currentFrame;
+        /// <summary>当前帧 PNG 字节数据（线程安全）</summary>
+        public byte[]? CurrentFrameBytes
+        {
+            get
+            {
+                lock (_frameLock)
+                {
+                    return _currentFrameBytes;
+                }
+            }
+        }
 
         /// <summary>动画类型</summary>
         public string AnimationType => _config?.Type ?? "png";
@@ -179,6 +190,12 @@ namespace MochiBot.Src.Renderer
                 _config.FrameWidth = _currentFrame.Width;
                 _config.FrameHeight = _currentFrame.Height;
                 _currentFrameIndex = 0;
+
+                // 同步生成 PNG 字节缓存
+                lock (_frameLock)
+                {
+                    _currentFrameBytes = EncodeToPngBytes(_currentFrame);
+                }
                 return true;
             }
             catch
@@ -188,7 +205,17 @@ namespace MochiBot.Src.Renderer
         }
 
         /// <summary>
-        /// 更新当前帧图像
+        /// 将 Image 编码为 PNG 字节数组
+        /// </summary>
+        private static byte[] EncodeToPngBytes(Image image)
+        {
+            using var ms = new MemoryStream();
+            image.Save(ms, ImageFormat.Png);
+            return ms.ToArray();
+        }
+
+        /// <summary>
+        /// 更新当前帧图像及 PNG 字节缓存
         /// </summary>
         private void UpdateCurrentFrame()
         {
@@ -209,6 +236,12 @@ namespace MochiBot.Src.Renderer
                 // 直接使用原始帧，保留 PNG 透明通道
                 _currentFrame?.Dispose();
                 _currentFrame = rawFrame;
+
+                // 同步生成 PNG 字节缓存（加锁保护）
+                lock (_frameLock)
+                {
+                    _currentFrameBytes = EncodeToPngBytes(rawFrame);
+                }
             }
         }
 
@@ -336,6 +369,10 @@ namespace MochiBot.Src.Renderer
             _spriteLoader?.Dispose();
             _gifImage?.Dispose();
             _currentFrame?.Dispose();
+            lock (_frameLock)
+            {
+                _currentFrameBytes = null;
+            }
             _spriteLoader = null;
             _gifImage = null;
             _currentFrame = null;

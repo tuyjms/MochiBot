@@ -35,8 +35,8 @@ namespace MochiBot.Src.Renderer
         /// <summary>当前动作名</summary>
         public string? CurrentAnimationName => _currentAnimationName;
 
-        /// <summary>当前帧图像</summary>
-        public Image? CurrentFrame => _currentRenderer?.CurrentFrame;
+        /// <summary>当前帧 PNG 字节数据（线程安全）</summary>
+        public byte[]? CurrentFrame => _currentRenderer?.CurrentFrameBytes;
 
         /// <summary>是否已初始化</summary>
         public bool IsInitialized => _initialized;
