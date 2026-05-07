@@ -60,7 +60,7 @@ public interface IAgent
     /// <summary>执行工具调用</summary>
     Task<string> ProcessToolCallAsync(string toolName, string parameters);
 
-    /// <summary>执行JS插件调用</summary>
+    /// <summary>执行DLLMOD插件调用</summary>
     Task<string> ProcessPluginCallAsync(string pluginName, string parameters);
 
     /// <summary>执行MCP服务器工具调用</summary>
@@ -179,7 +179,7 @@ var baseTools = _toolManager.GetToolDefinitions();
 // 第二层：心情附加工具（根据当前情绪动态注入）
 var moodTools = _toolManager.GetMoodBasedTools(_currentMood);
 
-// 第三层：插件/MCP工具（通过 list_plugins 间接获取）
+// 第三层：DLLMOD/MCP工具（通过 list_plugins 间接获取）
 // LLM 需要先调用 list_plugins 获取列表
 ```
 
