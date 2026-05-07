@@ -16,6 +16,7 @@ namespace MochiBot.Src.UI
         private System.Windows.Threading.DispatcherTimer _timer = new();
         private IEventDispatcher _eventDispatcher;
         private string? _replySubscriptionId;
+        private string? _moodSubscriptionId;
 
         // 消息列表
         private ObservableCollection<ChatMessageItem> _messages = new();
@@ -90,12 +91,40 @@ namespace MochiBot.Src.UI
                                         : "";
                                     if (!string.IsNullOrEmpty(content))
                                     {
-                                        // 在 UI 线程上添加消息
                                         Dispatcher.Invoke(() =>
                                         {
                                             AddMessage("小琪", content);
                                         });
                                     }
+                                }
+                            }
+                        }
+                        catch { }
+                    });
+
+                    _moodSubscriptionId = _eventDispatcher.Subscribe(EventCategory.MoodChange, (eventData) =>
+                    {
+                        try
+                        {
+                            using var doc = JsonDocument.Parse(eventData.Info);
+                            var root = doc.RootElement;
+
+                            if (root.TryGetProperty("animation", out var animProp))
+                            {
+                                var animationName = animProp.GetString();
+                                if (!string.IsNullOrEmpty(animationName))
+                                {
+                                    Dispatcher.Invoke(() => _renderer.PlayAnimation(animationName));
+                                    return;
+                                }
+                            }
+
+                            if (root.TryGetProperty("mood", out var moodProp))
+                            {
+                                var moodStr = moodProp.GetString();
+                                if (Enum.TryParse<AgentMood>(moodStr, true, out var mood))
+                                {
+                                    Dispatcher.Invoke(() => _renderer.SetMotion(mood));
                                 }
                             }
                         }

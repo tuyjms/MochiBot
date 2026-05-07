@@ -93,14 +93,13 @@ namespace MochiBot.Tests.Renderer
         }
 
         [Fact]
-        public void CurrentFrame_ShouldNotBeNullAfterLoad()
+        public void CurrentFrameBytes_ShouldNotBeNullAfterLoad()
         {
             var renderer = new SpriteRenderer();
             Assert.True(renderer.LoadFromJson(GetTestJsonPath()));
 
-            Assert.NotNull(renderer.CurrentFrame);
-            Assert.Equal(512, renderer.CurrentFrame!.Width);
-            Assert.Equal(689, renderer.CurrentFrame.Height);
+            Assert.NotNull(renderer.CurrentFrameBytes);
+            Assert.True(renderer.CurrentFrameBytes!.Length > 0);
             renderer.Dispose();
         }
 

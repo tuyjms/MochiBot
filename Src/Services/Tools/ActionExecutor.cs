@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using MochiBot.Src.Agent;
 using MochiBot.Src.Models;
 
@@ -188,6 +188,23 @@ namespace MochiBot.Src.Services.Tool
 
             System.Diagnostics.Debug.WriteLine(
                 $"[ActionExecutor] 工具执行: {action.Name}: {(result.Success ? "成功" : $"失败: {result.Error}")}");
+
+            if (result.Success && !string.IsNullOrEmpty(result.Data))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(result.Data);
+                    if (doc.RootElement.TryGetProperty("animation", out var animProp))
+                    {
+                        var animationName = animProp.GetString();
+                        if (!string.IsNullOrEmpty(animationName))
+                        {
+                            _onAnimation(animationName);
+                        }
+                    }
+                }
+                catch { }
+            }
 
             return currentReply;
         }

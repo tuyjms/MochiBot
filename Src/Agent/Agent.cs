@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using MochiBot.Src.Core.Config;
 using MochiBot.Src.Core.Config.Models;
 using MochiBot.Src.Core.Database;
@@ -84,7 +84,20 @@ namespace MochiBot.Src.Agent
                 _toolService,
                 mood => ChangeMoodByEvent(mood.ToString()),
                 (desc, param) => _shortTermMemory.AddMessage("system", $"[中期记忆] {desc}"),
-                anim => _lastEvent = $"animation:{anim}");
+                anim =>
+                {
+                    _lastEvent = $"animation:{anim}";
+                    _eventDispatcher.Publish(new EventData
+                    {
+                        Category = EventCategory.MoodChange,
+                        Trigger = EventTrigger.Tool,
+                        Info = JsonSerializer.Serialize(new
+                        {
+                            animation = anim,
+                            source = "tool"
+                        })
+                    });
+                });
 
             _systemPromptFormatter = new PromptFormatter(SystemPromptTemplate);
             _userContextFormatter = new PromptFormatter(UserContextTemplate);

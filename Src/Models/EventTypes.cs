@@ -1,4 +1,4 @@
-﻿namespace MochiBot.Src.Models
+namespace MochiBot.Src.Models
 {
     /// <summary>
     /// 事件分类枚举
@@ -41,6 +41,9 @@
 
         /// <summary>LLM触发</summary>
         Llm,
+
+        /// <summary>工具触发</summary>
+        Tool,
 
         /// <summary>插件触发</summary>
         Plugin,
