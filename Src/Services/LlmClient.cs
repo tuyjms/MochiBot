@@ -8,37 +8,33 @@ namespace MochiBot.Src.Services
     {
         private readonly IConfigReader _configReader;
         private readonly Dictionary<string, ProviderConfig> _providers;
+        private ChatClient _chatClient;
 
-        public LlmClient(IConfigReader configReader)
+        public LlmClient(string provider,string model,IConfigReader configReader)
         {
             _configReader = configReader;
-            _providers = _configReader.GetAllProviders();
+            _providers = _configReader.GetAllProviders();;
+
+            if (!_providers.TryGetValue(provider, out var config))
+            {throw new ArgumentException($"Provider '{provider}' not found in configuration.");}
+
+            var client = new OpenAI.OpenAIClient(new System.ClientModel.ApiKeyCredential(config.ApiKey), new OpenAI.OpenAIClientOptions
+            {Endpoint = new Uri(config.BaseUrl)});
+            _chatClient = client.GetChatClient(model);
         }
 
-        public virtual async Task<string> SendChatAsync(string providerName, string model, string prompt)
+        public virtual async Task<string> SendChatAsync(string prompt)
         {
             var messages = new List<ChatMessage>
             {
                 new UserChatMessage(prompt)
             };
-            return await SendChatAsync(providerName, model, messages);
+            return await SendChatAsync(messages);
         }
 
-        public virtual async Task<string> SendChatAsync(string providerName, string model, List<ChatMessage> messages)
+        public virtual async Task<string> SendChatAsync(List<ChatMessage> messages)
         {
-            if (!_providers.TryGetValue(providerName, out var config))
-            {
-                throw new ArgumentException($"Provider '{providerName}' not found in configuration.");
-            }
-
-            var client = new OpenAI.OpenAIClient(new System.ClientModel.ApiKeyCredential(config.ApiKey), new OpenAI.OpenAIClientOptions
-            {
-                Endpoint = new Uri(config.BaseUrl)
-            });
-
-            var chatClient = client.GetChatClient(model);
-
-            var completion = await chatClient.CompleteChatAsync(messages);
+            var completion = await _chatClient.CompleteChatAsync(messages);
             return completion.Value.Content[0].Text;
         }
 

@@ -1,4 +1,4 @@
-﻿namespace MochiBot.Src.Models
+﻿namespace MochiBot.Src.EventModels
 {
     /// <summary>
     /// 对话消息模型

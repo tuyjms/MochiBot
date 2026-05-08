@@ -1,5 +1,5 @@
 ﻿using System.Text.Json;
-using MochiBot.Src.Models;
+using MochiBot.Src.EventModels;
 
 namespace MochiBot.Src.Core.Events
 {

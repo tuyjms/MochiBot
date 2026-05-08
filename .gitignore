@@ -37,7 +37,7 @@ bld/
 *.jfm
 *.rsuser
 *.vssscc
-.vscode/settings.json
+.vscode
 
 # JetBrains Rider
 .idea/

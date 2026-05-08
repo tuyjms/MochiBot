@@ -5,7 +5,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using MochiBot.Src.Core.Events;
-using MochiBot.Src.Models;
+using MochiBot.Src.EventModels;
 using MochiBot.Src.Renderer;
 
 namespace MochiBot.Src.UI
@@ -173,7 +173,7 @@ namespace MochiBot.Src.UI
                 _eventDispatcher.Publish(new EventData
                 {
                     Category = EventCategory.UserInput,
-                    Trigger = MochiBot.Src.Models.EventTrigger.User,
+                    Trigger = EventModels.EventTrigger.User,
                     Info = text
                 });
             }

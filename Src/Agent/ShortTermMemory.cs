@@ -1,4 +1,4 @@
-﻿using MochiBot.Src.Models;
+﻿using MochiBot.Src.EventModels;
 
 namespace MochiBot.Src.Agent
 {

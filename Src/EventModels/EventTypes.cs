@@ -1,4 +1,4 @@
-namespace MochiBot.Src.Models
+namespace MochiBot.Src.EventModels
 {
     /// <summary>
     /// 事件分类枚举

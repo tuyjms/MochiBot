@@ -1,4 +1,4 @@
-﻿namespace MochiBot.Src.Core.Models
+﻿namespace MochiBot.Src.Core.Database.Models
 {
     /// <summary>
     /// 用户配置模型

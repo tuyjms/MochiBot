@@ -1,7 +1,7 @@
 ﻿using System.IO;
 using Microsoft.Data.Sqlite;
-using MochiBot.Src.Core.Models;
-using MochiBot.Src.Models;
+using MochiBot.Src.Core.Database.Models;
+using MochiBot.Src.EventModels;
 
 namespace MochiBot.Src.Core.Database
 {

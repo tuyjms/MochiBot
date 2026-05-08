@@ -1,6 +1,6 @@
 ﻿using MochiBot.Src.Core.Database;
 using MochiBot.Src.Core.Models;
-using MochiBot.Src.Models;
+using MochiBot.Src.EventModels;
 namespace MochiBot.Tests;
 
 public class DatabaseServiceTests : IDisposable

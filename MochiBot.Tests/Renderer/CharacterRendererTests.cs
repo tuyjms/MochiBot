@@ -1,4 +1,4 @@
-﻿using MochiBot.Src.Models;
+﻿using MochiBot.Src.EventModels;
 using MochiBot.Src.Renderer;
 
 namespace MochiBot.Tests.Renderer

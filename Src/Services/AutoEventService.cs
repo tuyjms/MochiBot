@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using System.Timers;
 using MochiBot.Src.Core.Events;
-using MochiBot.Src.Models;
+using MochiBot.Src.EventModels;
 using Timer = System.Timers.Timer;
 
 namespace MochiBot.Src.Services

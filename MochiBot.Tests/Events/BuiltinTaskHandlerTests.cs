@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 using MochiBot.Src.Core.Events;
-using MochiBot.Src.Models;
+using MochiBot.Src.EventModels;
 
 namespace MochiBot.Tests;
 

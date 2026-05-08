@@ -1,6 +1,6 @@
 ﻿using System.Drawing;
 using System.IO;
-using MochiBot.Src.Models;
+using MochiBot.Src.EventModels;
 
 namespace MochiBot.Src.Renderer
 {

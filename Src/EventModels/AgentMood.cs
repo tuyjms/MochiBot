@@ -1,4 +1,4 @@
-﻿namespace MochiBot.Src.Models
+﻿namespace MochiBot.Src.EventModels
 {
     /// <summary>
     /// AI桌宠情绪状态枚举
