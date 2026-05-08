@@ -1,0 +1,11 @@
+{
+  "type": "sprite",
+  "file": "眯眼.png",
+  "frameWidth": 512,
+  "frameHeight": 689,
+  "totalFrames": 17,
+  "columns": 17,
+  "rows": 1,
+  "fps": 15,
+  "loop": true
+}

@@ -1,0 +1,11 @@
+{
+  "type": "sprite",
+  "file": "zzz.png",
+  "frameWidth": 512,
+  "frameHeight": 689,
+  "totalFrames": 27,
+  "columns": 27,
+  "rows": 1,
+  "fps": 15,
+  "loop": true
+}

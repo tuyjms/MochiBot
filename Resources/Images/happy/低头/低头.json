@@ -1,0 +1,11 @@
+{
+  "type": "sprite",
+  "file": "低头.png",
+  "frameWidth": 512,
+  "frameHeight": 689,
+  "totalFrames": 21,
+  "columns": 21,
+  "rows": 1,
+  "fps": 15,
+  "loop": true
+}

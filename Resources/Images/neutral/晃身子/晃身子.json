@@ -1,0 +1,11 @@
+{
+  "type": "sprite",
+  "file": "晃身子.png",
+  "frameWidth": 512,
+  "frameHeight": 689,
+  "totalFrames": 48,
+  "columns": 48,
+  "rows": 1,
+  "fps": 15,
+  "loop": true
+}

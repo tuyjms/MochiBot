@@ -1,0 +1,11 @@
+{
+  "type": "sprite",
+  "file": "捧脸笑.png",
+  "frameWidth": 512,
+  "frameHeight": 689,
+  "totalFrames": 34,
+  "columns": 34,
+  "rows": 1,
+  "fps": 15,
+  "loop": true
+}
