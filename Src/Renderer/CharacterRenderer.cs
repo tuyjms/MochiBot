@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 using System.IO;
 using MochiBot.Src.Models;
 
@@ -10,6 +10,31 @@ namespace MochiBot.Src.Renderer
     /// </summary>
     public class CharacterRenderer : ICharacterRenderer, IDisposable
     {
+        // 心情工具名 → 对应情绪
+        private static readonly Dictionary<string, AgentMood> ToolMoodMap = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "cry",    AgentMood.Sad },
+            { "dance",  AgentMood.Happy },
+            { "yawn",   AgentMood.Sleepy },
+            { "blush",  AgentMood.Touched },
+            { "stomp",  AgentMood.Angry },
+        };
+
+        // 情绪 → 该情绪下的所有动作目录名
+        private static readonly Dictionary<AgentMood, string[]> MoodActions = new()
+        {
+            { AgentMood.Neutral,    new[] { "默认", "左右张望", "晃身子", "眯眼" } },
+            { AgentMood.Happy,      new[] { "低头", "捧脸笑" } },
+            { AgentMood.Sad,        new[] { "脸红" } },
+            { AgentMood.Sleepy,     new[] { "zzz" } },
+            { AgentMood.Surprised,  new[] { "捧脸" } },
+            { AgentMood.Teasing,    new[] { "歪头杀" } },
+            { AgentMood.Touched,    new[] { "脸红" } },
+            { AgentMood.Angry,      new[] { "跺脚" } },
+        };
+
+        private static readonly Random Rng = new();
+
         // 情绪→动作目录映射
         private readonly Dictionary<AgentMood, List<string>> _moodAnimations = new();
         // 动作名→SpriteRenderer 缓存
@@ -132,10 +157,8 @@ namespace MochiBot.Src.Renderer
             if (!_initialized) return;
             _currentMood = mood;
 
-            // 获取该情绪下的可用动作列表
             if (!_moodAnimations.TryGetValue(mood, out var actions) || actions.Count == 0)
             {
-                // 没有对应情绪的资源，尝试回退到 neutral
                 if (mood != AgentMood.Neutral)
                 {
                     SetMotion(AgentMood.Neutral);
@@ -143,8 +166,7 @@ namespace MochiBot.Src.Renderer
                 return;
             }
 
-            // 默认选择第一个动作
-            var actionName = actions[0];
+            var actionName = actions[Rng.Next(actions.Count)];
             PlayAnimationInternal(actionName);
         }
 
@@ -178,7 +200,18 @@ namespace MochiBot.Src.Renderer
                         break;
                     }
                 }
-                if (!Directory.Exists(actionDir)) return;
+                if (!Directory.Exists(actionDir))
+                {
+                    // 别名映射：工具名（cry/dance等）→ 情绪 → 随机选一个动作
+                    if (ToolMoodMap.TryGetValue(actionName, out var toolMood) &&
+                        _moodAnimations.TryGetValue(toolMood, out var available) && available.Count > 0)
+                    {
+                        var pick = available[Rng.Next(available.Count)];
+                        PlayAnimationInternal(pick);
+                        return;
+                    }
+                    return;
+                }
             }
 
             // 如果已有相同动画在播放，不重复加载
