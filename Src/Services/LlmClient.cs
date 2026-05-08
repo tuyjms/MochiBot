@@ -1,43 +1,18 @@
-﻿using System.Text.Json;
-using System.IO;
-using OpenAI.Chat;
+﻿using OpenAI.Chat;
+using MochiBot.Src.Core.Config;
+using MochiBot.Src.Core.Config.Models;
 
 namespace MochiBot.Src.Services
 {
     public class LlmClient
     {
+        private readonly IConfigReader _configReader;
         private readonly Dictionary<string, ProviderConfig> _providers;
 
-        public LlmClient()
+        public LlmClient(IConfigReader configReader)
         {
-            _providers = LoadProviders();
-        }
-
-        private static Dictionary<string, ProviderConfig> LoadProviders()
-        {
-            var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "appsettings.json");
-            if (!File.Exists(configPath))
-            {
-                return new Dictionary<string, ProviderConfig>();
-            }
-
-            var json = File.ReadAllText(configPath);
-            using var document = JsonDocument.Parse(json);
-            var providers = new Dictionary<string, ProviderConfig>();
-
-            if (document.RootElement.TryGetProperty("Providers", out var providersElement))
-            {
-                foreach (var property in providersElement.EnumerateObject())
-                {
-                    var providerName = property.Name;
-                    var configElement = property.Value;
-                    var apiKey = configElement.GetProperty("ApiKey").GetString() ?? "";
-                    var baseUrl = configElement.GetProperty("BaseUrl").GetString() ?? "";
-                    providers[providerName] = new ProviderConfig(apiKey, baseUrl);
-                }
-            }
-
-            return providers;
+            _configReader = configReader;
+            _providers = _configReader.GetAllProviders();
         }
 
         public virtual async Task<string> SendChatAsync(string providerName, string model, string prompt)
@@ -72,6 +47,4 @@ namespace MochiBot.Src.Services
             return _providers.Keys;
         }
     }
-
-    public record ProviderConfig(string ApiKey, string BaseUrl);
 }

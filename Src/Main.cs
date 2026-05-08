@@ -38,7 +38,7 @@ namespace MochiBot
                 var configReader = ConfigReader.Instance;
 
                 // 创建依赖
-                var llmClient = new LlmClient();
+                var llmClient = new LlmClient(configReader);
                 var shortTermMemory = new ShortTermMemory();
                 var toolService = new ToolService(llmClient, configReader);
 
