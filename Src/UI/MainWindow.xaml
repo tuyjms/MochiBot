@@ -31,7 +31,7 @@
                 <!-- 小头像 -->
                 <Border Grid.Column="0" Width="24" Height="24" CornerRadius="12" Background="#FFE8D5C4"
                         VerticalAlignment="Center" Margin="0,0,8,0">
-                    <TextBlock Text="小" FontSize="11" FontWeight="Bold"
+                    <TextBlock x:Name="bubbleAvatarText" Text="小" FontSize="11" FontWeight="Bold"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                Foreground="#FF8B6F5E"/>
                 </Border>

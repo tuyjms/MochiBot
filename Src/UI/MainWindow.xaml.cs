@@ -93,6 +93,11 @@ namespace MochiBot.Src.UI
 
             // 设置 Owner 使聊天窗口在主窗口之上
             _chatWindow.Owner = this;
+
+            // 从配置读取角色名称更新气泡头像
+            var personality = _configReader.GetActivePersonality();
+            var characterName = personality?.Name ?? "小琪";
+            bubbleAvatarText.Text = characterName.Length > 0 ? characterName[..1] : "琪";
         }
 
         /// <summary>

@@ -23,13 +23,13 @@
                 <!-- 头像 -->
                 <Border Grid.Column="0" Width="32" Height="32" CornerRadius="16" Background="#FFE8D5C4"
                         VerticalAlignment="Center">
-                    <TextBlock Text="小" FontSize="14" FontWeight="Bold"
+                    <TextBlock x:Name="characterAvatarText" Text="小" FontSize="14" FontWeight="Bold"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                Foreground="#FF8B6F5E"/>
                 </Border>
                 <!-- 名称 -->
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0,0,0">
-                    <TextBlock Text="小琪" FontSize="15" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="characterNameText" Text="小琪" FontSize="15" FontWeight="SemiBold"/>
                     <TextBlock Text="在线" FontSize="11" Foreground="#FF4CAF50"/>
                 </StackPanel>
                 <!-- 关闭按钮 -->

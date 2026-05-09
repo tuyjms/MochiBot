@@ -38,8 +38,30 @@ namespace MochiBot.Src.UI
 
             messageList.ItemsSource = _messages;
 
+            // 从配置读取角色名称
+            LoadCharacterName();
+
             // 订阅 agent 回复事件
             SubscribeToReplyEvents();
+        }
+
+        /// <summary>
+        /// 从配置读取角色名称并更新 UI
+        /// </summary>
+        private void LoadCharacterName()
+        {
+            var personality = _configReader.GetActivePersonality();
+            var characterName = personality?.Name ?? "小琪";
+
+            // 更新窗口标题
+            Title = characterName;
+
+            // 更新标题栏中的名称和头像文字
+            if (FindName("characterNameText") is System.Windows.Controls.TextBlock nameText)
+                nameText.Text = characterName;
+
+            if (FindName("characterAvatarText") is System.Windows.Controls.TextBlock avatarText)
+                avatarText.Text = characterName.Length > 0 ? characterName[..1] : "琪";
         }
 
         private void SubscribeToReplyEvents()
