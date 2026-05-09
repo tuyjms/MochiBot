@@ -25,7 +25,13 @@ namespace MochiBot.Src.EventModels
         Plugin,
 
         /// <summary>MCP事件</summary>
-        Mcp
+        Mcp,
+
+        /// <summary>配置更新请求事件（UI → ConfigReader）</summary>
+        ConfigUpdate,
+
+        /// <summary>配置已变更事件（ConfigReader → 各模块，触发热重载）</summary>
+        ConfigChanged
     }
 
     /// <summary>

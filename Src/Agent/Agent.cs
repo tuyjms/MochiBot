@@ -5,6 +5,7 @@ using MochiBot.Src.Core.Database;
 using MochiBot.Src.Core.Events;
 using MochiBot.Src.EventModels;
 using MochiBot.Src.Services;
+using LlmClient = MochiBot.Src.Services.LlmClient;
 using OpenAiChatMessage = OpenAI.Chat.ChatMessage;
 using OpenAiSystemChatMessage = OpenAI.Chat.SystemChatMessage;
 using OpenAiUserChatMessage = OpenAI.Chat.UserChatMessage;
@@ -15,16 +16,19 @@ namespace MochiBot.Src.Agent
     /// <summary>
     /// Agent 核心协调层实现
     /// 通过事件调度器接收事件，处理完成后发布回复事件
+    /// 自管理 LlmClient、ShortTermMemory 和 LongMemory
     /// </summary>
     public class MainAgent : IAgent
     {
         private readonly IEventDispatcher _eventDispatcher;
-        private readonly LlmClient _llmClient;
+        private readonly IConfigReader _configReader;
+        private LlmClient _llmClient;
         private readonly IShortTermMemory _shortTermMemory;
         private readonly IToolService _toolService;
         private readonly IDatabaseService? _databaseService;
-        private readonly AppSettings _appSettings;
-        private readonly PersonalityConfig? _personality;
+        private AppSettings _appSettings;
+        private PersonalityConfig? _personality;
+        private SubPersonality? _currentSubPersonality;
 
         // 事件订阅ID
         private readonly List<string> _subscriptionIds = new();
@@ -39,7 +43,7 @@ namespace MochiBot.Src.Agent
         private string _lastEvent = string.Empty;
         private string _lastJsonError = string.Empty;
 
-        // 对话模式 System Prompt 模板
+        // 对话模式 System Prompt 模板（固定模板，人格提示词动态注入）
         private const string SystemPromptTemplate = @"
 你是一个名叫{Name}，你的性格是{Personality}。
 你的主人（用户）叫{UserName}，请用这个名字称呼。
@@ -63,20 +67,28 @@ namespace MochiBot.Src.Agent
 
         public MainAgent(
             IEventDispatcher eventDispatcher,
-            LlmClient llmClient,
             IConfigReader configReader,
-            IShortTermMemory shortTermMemory,
             IToolService toolService,
             IDatabaseService? databaseService = null)
         {
             _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
-            _llmClient = llmClient ?? throw new ArgumentNullException(nameof(llmClient));
-            _shortTermMemory = shortTermMemory ?? throw new ArgumentNullException(nameof(shortTermMemory));
+            _configReader = configReader ?? throw new ArgumentNullException(nameof(configReader));
             _toolService = toolService ?? throw new ArgumentNullException(nameof(toolService));
             _databaseService = databaseService;
 
             _appSettings = configReader.GetAppSettings();
             _personality = configReader.GetActivePersonality();
+
+            // 选择当前子人格（按权重概率）
+            _currentSubPersonality = SelectSubPersonalityByWeight();
+
+            // 自创建 LlmClient
+            _llmClient = CreateLlmClient();
+
+            // 自创建 ShortTermMemory
+            var maxMessages = _currentSubPersonality?.MaxMessages ?? 50;
+            _shortTermMemory = new ShortTermMemory(maxMessages, _configReader);
+            _shortTermMemory.SetLlmClient(_llmClient);
 
             // 创建 ActionExecutor，将 actions 执行逻辑委托给它
             _actionExecutor = new ActionExecutor(
@@ -135,6 +147,101 @@ namespace MochiBot.Src.Agent
                 catch { }
             });
             _subscriptionIds.Add(uiSubId);
+
+            // 订阅配置变更事件（热重载）
+            var configChangedSubId = _eventDispatcher.Subscribe(EventCategory.ConfigChanged, OnConfigChanged);
+            _subscriptionIds.Add(configChangedSubId);
+        }
+
+        /// <summary>处理配置变更事件（热重载）</summary>
+        private void OnConfigChanged(EventData eventData)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(eventData.Info);
+                var root = doc.RootElement;
+
+                if (!root.TryGetProperty("changedItems", out var changedItems))
+                    return;
+
+                var items = new List<string>();
+                foreach (var item in changedItems.EnumerateArray())
+                {
+                    items.Add(item.GetString() ?? "");
+                }
+
+                // 刷新 AppSettings
+                _appSettings = _configReader.GetAppSettings();
+
+                // 检查 ProviderConfig 是否变更（需要重建 LlmClient）
+                if (items.Contains("ProviderConfig"))
+                {
+                    _llmClient = CreateLlmClient();
+                    _configReader.Logger.Info("[Agent] ProviderConfig 已变更，LlmClient 已重建");
+                }
+
+                // 检查人格配置是否变更（刷新人格描述）
+                if (items.Contains("PersonalityConfig"))
+                {
+                    _personality = _configReader.GetActivePersonality();
+                    _currentSubPersonality = SelectSubPersonalityByWeight();
+                    _configReader.Logger.Info("[Agent] 人格配置已刷新");
+                }
+
+                // 检查 MaxMessages 是否变更
+                if (items.Contains("MaxMessages") && _currentSubPersonality != null)
+                {
+                    _shortTermMemory.Capacity = _currentSubPersonality.MaxMessages;
+                    _configReader.Logger.Info($"[Agent] 短期记忆容量已调整为: {_currentSubPersonality.MaxMessages}");
+                }
+            }
+            catch (Exception ex)
+            {
+                _configReader.Logger.Error($"[Agent] 处理配置变更事件失败", ex);
+            }
+        }
+
+        /// <summary>
+        /// 根据权重概率选择子人格
+        /// 所有权重和必须为100，否则返回第一个子人格（禁用切换机制）
+        /// </summary>
+        private SubPersonality? SelectSubPersonalityByWeight()
+        {
+            if (_personality?.Personalities == null || _personality.Personalities.Count == 0)
+                return null;
+
+            var totalWeight = _personality.Personalities.Sum(p => p.Weight);
+
+            // 权重和不为100时，禁用切换机制，使用第一个子人格
+            if (totalWeight != 100)
+            {
+                _configReader.Logger.Warn($"[Agent] 子人格权重和({totalWeight})不为100，人格切换机制已禁用，使用默认子人格");
+                return _personality.Personalities[0];
+            }
+
+            // 按权重随机选择
+            var roll = Random.Shared.Next(100);
+            var cumulative = 0;
+            foreach (var sub in _personality.Personalities)
+            {
+                cumulative += sub.Weight;
+                if (roll < cumulative)
+                {
+                    _configReader.Logger.Info($"[Agent] 按权重选择子人格: {sub.Name} (权重: {sub.Weight}, 随机值: {roll})");
+                    return sub;
+                }
+            }
+
+            // fallback
+            return _personality.Personalities[0];
+        }
+
+        /// <summary>根据当前子人格创建 LlmClient</summary>
+        private LlmClient CreateLlmClient()
+        {
+            var (provider, model) = GetChatModel();
+            _configReader.Logger.Info($"[Agent] 创建 LlmClient: Provider={provider}, Model={model}");
+            return new LlmClient(provider, model, _configReader);
         }
 
         // ========== 心情记录器（集成到 Agent 内部） ==========
@@ -178,8 +285,6 @@ namespace MochiBot.Src.Agent
                 _ = _databaseService.LogMoodChangeAsync(newMood, eventType);
             }
         }
-
-        private readonly Random _random = new();
 
         // ========== 统一事件处理 ==========
 
@@ -250,7 +355,7 @@ namespace MochiBot.Src.Agent
                 }
 
                 // 根据权重随机决定：roll < weight 时使用 LLM，否则使用内置文本
-                var roll = _random.Next(100);
+                var roll = Random.Shared.Next(100);
                 if (roll < weight)
                 {
                     // 使用 LLM 生成回复（返回 false 让 ProcessEventAsync 继续处理）
@@ -392,12 +497,16 @@ namespace MochiBot.Src.Agent
 
         // ========== 私有方法 ==========
 
-        /// <summary>构建 System Prompt</summary>
+        /// <summary>构建 System Prompt（人格提示词动态注入）</summary>
         private string BuildSystemPrompt()
         {
             var name = _personality?.Name ?? "小琪";
-            var personalityDesc = _personality?.Description ?? "温柔可爱，善解人意";
             var userName = _appSettings.UserName;
+
+            // 人格描述：优先使用当前子人格的描述，否则使用人格根描述
+            var personalityDesc = _currentSubPersonality?.Description
+                ?? _personality?.Description
+                ?? "温柔可爱，善解人意";
 
             // 基础工具描述
             var baseTools = _toolService.GetToolDefinitions();
@@ -459,23 +568,28 @@ namespace MochiBot.Src.Agent
             return ("LocalLMStudio", modelFullName);
         }
 
-        /// <summary>获取对话模型名称（优先从人格配置读取）</summary>
-        private string GetChatModel()
+        /// <summary>获取对话模型名称（优先从当前子人格读取）</summary>
+        private (string provider, string model) GetChatModel()
         {
-            // 从人格配置的第一个子人格中获取模型
+            // 从当前子人格中获取模型
+            if (_currentSubPersonality?.ChatModels?.Count > 0)
+            {
+                return ParseModelName(_currentSubPersonality.ChatModels[0]);
+            }
+
+            // fallback：从人格配置的第一个子人格获取
             if (_personality?.Personalities?.Count > 0 &&
                 _personality.Personalities[0].ChatModels?.Count > 0)
             {
-                return _personality.Personalities[0].ChatModels[0];
+                return ParseModelName(_personality.Personalities[0].ChatModels[0]);
             }
-            return "default";
+
+            return ("LocalLMStudio", "default");
         }
 
         /// <summary>调用 LLM 对话模式</summary>
         private async Task<string> CallLlmChatAsync(List<ChatMessage> messages)
         {
-            var (provider, model) = ParseModelName(GetChatModel());
-
             var openAiMessages = messages.Select(m => m.Role switch
             {
                 "system" => (OpenAiChatMessage)new OpenAiSystemChatMessage(m.Content),
@@ -484,7 +598,7 @@ namespace MochiBot.Src.Agent
                 _ => new OpenAiUserChatMessage(m.Content)
             }).ToList();
 
-            return await _llmClient.SendChatAsync(provider, model, openAiMessages);
+            return await _llmClient.SendChatAsync(openAiMessages);
         }
 
         /// <summary>解析 LLM 响应，提取回复文本和 actions</summary>

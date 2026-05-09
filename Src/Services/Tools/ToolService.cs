@@ -50,7 +50,7 @@ namespace MochiBot.Src.Services.Tool
             }
         };
 
-        public ToolService(LlmClient llmClient, IConfigReader configReader, IDllModLoader? modLoader = null)
+        public ToolService(IConfigReader configReader, IDllModLoader? modLoader = null)
         {
             _configReader = configReader ?? throw new ArgumentNullException(nameof(configReader));
             _modLoader = modLoader ?? new DllModLoader();

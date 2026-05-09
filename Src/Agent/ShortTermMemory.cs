@@ -1,9 +1,12 @@
-﻿using MochiBot.Src.EventModels;
+﻿using MochiBot.Src.Core.Config;
+using MochiBot.Src.EventModels;
+using MochiBot.Src.Services;
 
 namespace MochiBot.Src.Agent
 {
     /// <summary>
     /// 短期记忆 - 环形缓冲区实现，固定容量，自动淘汰旧记录
+    /// 自管理 LlmClient，用于 SummarizeAsync 的真实 LLM 调用
     /// </summary>
     public class ShortTermMemory : IShortTermMemory
     {
@@ -11,18 +14,21 @@ namespace MochiBot.Src.Agent
         private int _head;
         private int _count;
         private int _capacity;
+        private LlmClient? _llmClient;
         private OverflowStrategy _overflowStrategy = OverflowStrategy.Truncate;
         private string? _contextSummary;
+        private readonly IConfigReader _configReader;
 
         private const int DefaultCapacity = 50;
         private const int SummaryReservedCount = 10;
 
-        public ShortTermMemory(int capacity = DefaultCapacity)
+        public ShortTermMemory(int capacity = DefaultCapacity, IConfigReader? configReader = null)
         {
             _capacity = capacity > 0 ? capacity : DefaultCapacity;
             _buffer = new ChatMessage[_capacity];
             _head = 0;
             _count = 0;
+            _configReader = configReader ?? ConfigReader.Instance;
         }
 
         public int Count => _count;
@@ -54,6 +60,14 @@ namespace MochiBot.Src.Agent
         }
 
         public string? ContextSummary => _contextSummary;
+
+        /// <summary>
+        /// 设置或更新 LlmClient 实例（用于热重载时重建）
+        /// </summary>
+        public void SetLlmClient(LlmClient llmClient)
+        {
+            _llmClient = llmClient;
+        }
 
         public void AddMessage(string role, string content)
         {
@@ -128,10 +142,8 @@ namespace MochiBot.Src.Agent
             _contextSummary = null;
         }
 
-        public Task<string> SummarizeAsync()
+        public async Task<string> SummarizeAsync()
         {
-            // 在实际应用中，这里会调用 LLM 进行总结
-            // 当前实现返回占位符，由外部注入实际的 LLM 调用
             var messagesToSummarize = new List<ChatMessage>();
             var reservedMessages = new List<ChatMessage>();
 
@@ -150,8 +162,28 @@ namespace MochiBot.Src.Agent
             var chatHistory = string.Join("\n",
                 messagesToSummarize.Select(m => $"{m.Role}: {m.Content}"));
 
-            // 模拟 LLM 总结（实际应由外部 LLM 调用完成）
-            var summary = $"对话摘要：共 {messagesToSummarize.Count} 条消息，涉及 {messagesToSummarize.Select(m => m.Role).Distinct().Count()} 个角色。";
+            string summary;
+
+            // 如果有 LlmClient，使用 LLM 进行真实总结
+            if (_llmClient != null && messagesToSummarize.Count > 0)
+            {
+                try
+                {
+                    var prompt = $"请总结以下对话的核心内容，提取关键信息（用户偏好、重要事件、约定等）：\n\n{chatHistory}";
+                    summary = await _llmClient.SendChatAsync(prompt);
+                    _configReader.Logger.Info($"[ShortTermMemory] LLM 总结完成: {summary[..Math.Min(summary.Length, 100)]}...");
+                }
+                catch (Exception ex)
+                {
+                    _configReader.Logger.Warn($"[ShortTermMemory] LLM 总结失败，使用默认摘要: {ex.Message}");
+                    summary = $"对话摘要：共 {messagesToSummarize.Count} 条消息，涉及 {messagesToSummarize.Select(m => m.Role).Distinct().Count()} 个角色。";
+                }
+            }
+            else
+            {
+                // 没有 LlmClient 时使用默认摘要
+                summary = $"对话摘要：共 {messagesToSummarize.Count} 条消息，涉及 {messagesToSummarize.Select(m => m.Role).Distinct().Count()} 个角色。";
+            }
 
             // 重建缓冲区：摘要(system角色) + 保留的最近消息
             Clear();
@@ -162,7 +194,7 @@ namespace MochiBot.Src.Agent
                 AddMessage(msg.Role, msg.Content);
             }
 
-            return Task.FromResult(summary);
+            return summary;
         }
     }
 }

@@ -27,6 +27,18 @@
         public string Description { get; set; } = string.Empty;
 
         /// <summary>
+        /// 子人格切换概率权重（0-100）
+        /// 所有子人格的权重和必须为100，否则人格切换机制禁用
+        /// </summary>
+        public int Weight { get; set; } = 0;
+
+        /// <summary>
+        /// 短期记忆最大消息条数
+        /// 该子人格激活时，短期记忆最多保留的消息数量
+        /// </summary>
+        public int MaxMessages { get; set; } = 50;
+
+        /// <summary>
         /// 对话主力LLM模型列表（按优先级排序，支持故障转移）
         /// 格式："{提供商名称}/{模型名称}"
         /// 示例：["LocalLMStudio/qwen2.5-7b", "OpenAI/gpt-4o-mini"]

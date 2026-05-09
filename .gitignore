@@ -38,6 +38,7 @@ bld/
 *.rsuser
 *.vssscc
 .vscode
+.clinerules
 
 # JetBrains Rider
 .idea/

@@ -37,17 +37,13 @@ namespace MochiBot
                 ConfigReader.Initialize(configPath);
                 var configReader = ConfigReader.Instance;
 
-                // 创建依赖
-                var llmClient = new LlmClient(configReader);
-                var shortTermMemory = new ShortTermMemory();
-                var toolService = new ToolService(llmClient, configReader);
+                // 创建依赖（Agent 自管理 LlmClient 和 ShortTermMemory）
+                var toolService = new ToolService(configReader);
 
                 // 创建 Agent（传入同一个 EventDispatcher）
                 Agent = new MainAgent(
                     EventDispatcher,
-                    llmClient,
                     configReader,
-                    shortTermMemory,
                     toolService);
 
                 // 启动事件调度器定时任务
