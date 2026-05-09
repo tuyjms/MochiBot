@@ -83,20 +83,36 @@
             </Grid>
         </Border>
 
-        <!-- 切换聊天按钮 -->
-        <Border Width="36" 
-                Height="36"
-                HorizontalAlignment="Right" 
-                VerticalAlignment="Bottom" 
-                Margin="0,0,10,10"
-                CornerRadius="18"
-                Background="#CCFFFFFF">
-            <Button x:Name="toggleChatButton" 
-                    Content="💬" 
-                    FontSize="18"
-                    Background="Transparent"
-                    BorderThickness="0"
-                    Click="ToggleChatButton_Click"/>
-        </Border>
+        <!-- 底部按钮区域 -->
+        <StackPanel Orientation="Horizontal" 
+                    HorizontalAlignment="Right" 
+                    VerticalAlignment="Bottom" 
+                    Margin="0,0,10,10">
+            <!-- 设置按钮 -->
+            <Border Width="36" 
+                    Height="36"
+                    Margin="0,0,6,0"
+                    CornerRadius="18"
+                    Background="#CCFFFFFF">
+                <Button x:Name="settingsButton" 
+                        Content="⚙️" 
+                        FontSize="16"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Click="SettingsButton_Click"/>
+            </Border>
+            <!-- 切换聊天按钮 -->
+            <Border Width="36" 
+                    Height="36"
+                    CornerRadius="18"
+                    Background="#CCFFFFFF">
+                <Button x:Name="toggleChatButton" 
+                        Content="💬" 
+                        FontSize="18"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Click="ToggleChatButton_Click"/>
+            </Border>
+        </StackPanel>
     </Grid>
 </Window>

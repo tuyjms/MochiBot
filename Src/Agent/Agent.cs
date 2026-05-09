@@ -22,10 +22,12 @@ namespace MochiBot.Src.Agent
     {
         private readonly IEventDispatcher _eventDispatcher;
         private readonly IConfigReader _configReader;
-        private LlmClient _llmClient;
+        private LlmClient _chatLlmClient;      // 对话模型（ChatModels）
+        private LlmClient _functionLlmClient;  // 函数调用模型（FunctionModels，用于摘要、关键词提取等）
         private readonly IShortTermMemory _shortTermMemory;
+        private readonly ILongMemory _longMemory;
         private readonly IToolService _toolService;
-        private readonly IDatabaseService? _databaseService;
+        private readonly MoodLogRepository? _moodLogRepository;
         private AppSettings _appSettings;
         private PersonalityConfig? _personality;
         private SubPersonality? _currentSubPersonality;
@@ -69,12 +71,12 @@ namespace MochiBot.Src.Agent
             IEventDispatcher eventDispatcher,
             IConfigReader configReader,
             IToolService toolService,
-            IDatabaseService? databaseService = null)
+            MoodLogRepository? moodLogRepository = null)
         {
             _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
             _configReader = configReader ?? throw new ArgumentNullException(nameof(configReader));
             _toolService = toolService ?? throw new ArgumentNullException(nameof(toolService));
-            _databaseService = databaseService;
+            _moodLogRepository = moodLogRepository;
 
             _appSettings = configReader.GetAppSettings();
             _personality = configReader.GetActivePersonality();
@@ -82,13 +84,18 @@ namespace MochiBot.Src.Agent
             // 选择当前子人格（按权重概率）
             _currentSubPersonality = SelectSubPersonalityByWeight();
 
-            // 自创建 LlmClient
-            _llmClient = CreateLlmClient();
+            // 自创建 LlmClient（对话模型 + 函数调用模型）
+            _chatLlmClient = CreateChatLlmClient();
+            _functionLlmClient = CreateFunctionLlmClient();
 
-            // 自创建 ShortTermMemory
-            var maxMessages = _currentSubPersonality?.MaxMessages ?? 50;
+            // 自创建 ShortTermMemory（使用函数调用模型）
+            var maxMessages = _personality?.MaxMessages ?? 50;
             _shortTermMemory = new ShortTermMemory(maxMessages, _configReader);
-            _shortTermMemory.SetLlmClient(_llmClient);
+            _shortTermMemory.SetLlmClient(_functionLlmClient);
+
+            // 自创建 LongMemory（使用函数调用模型）
+            _longMemory = new LongMemory(_configReader);
+            _longMemory.SetLlmClient(_functionLlmClient);
 
             // 创建 ActionExecutor，将 actions 执行逻辑委托给它
             _actionExecutor = new ActionExecutor(
@@ -176,7 +183,10 @@ namespace MochiBot.Src.Agent
                 // 检查 ProviderConfig 是否变更（需要重建 LlmClient）
                 if (items.Contains("ProviderConfig"))
                 {
-                    _llmClient = CreateLlmClient();
+                    _chatLlmClient = CreateChatLlmClient();
+                    _functionLlmClient = CreateFunctionLlmClient();
+                    _shortTermMemory.SetLlmClient(_functionLlmClient);
+                    _longMemory.SetLlmClient(_functionLlmClient);
                     _configReader.Logger.Info("[Agent] ProviderConfig 已变更，LlmClient 已重建");
                 }
 
@@ -189,10 +199,10 @@ namespace MochiBot.Src.Agent
                 }
 
                 // 检查 MaxMessages 是否变更
-                if (items.Contains("MaxMessages") && _currentSubPersonality != null)
+                if (items.Contains("MaxMessages") && _personality != null)
                 {
-                    _shortTermMemory.Capacity = _currentSubPersonality.MaxMessages;
-                    _configReader.Logger.Info($"[Agent] 短期记忆容量已调整为: {_currentSubPersonality.MaxMessages}");
+                    _shortTermMemory.Capacity = _personality.MaxMessages;
+                    _configReader.Logger.Info($"[Agent] 短期记忆容量已调整为: {_personality.MaxMessages}");
                 }
             }
             catch (Exception ex)
@@ -236,11 +246,19 @@ namespace MochiBot.Src.Agent
             return _personality.Personalities[0];
         }
 
-        /// <summary>根据当前子人格创建 LlmClient</summary>
-        private LlmClient CreateLlmClient()
+        /// <summary>创建对话模型 LlmClient（ChatModels）</summary>
+        private LlmClient CreateChatLlmClient()
         {
             var (provider, model) = GetChatModel();
-            _configReader.Logger.Info($"[Agent] 创建 LlmClient: Provider={provider}, Model={model}");
+            _configReader.Logger.Info($"[Agent] 创建对话 LlmClient: Provider={provider}, Model={model}");
+            return new LlmClient(provider, model, _configReader);
+        }
+
+        /// <summary>创建函数调用模型 LlmClient（FunctionModels，用于摘要、关键词提取等后台任务）</summary>
+        private LlmClient CreateFunctionLlmClient()
+        {
+            var (provider, model) = GetFunctionModel();
+            _configReader.Logger.Info($"[Agent] 创建函数调用 LlmClient: Provider={provider}, Model={model}");
             return new LlmClient(provider, model, _configReader);
         }
 
@@ -280,9 +298,9 @@ namespace MochiBot.Src.Agent
             });
 
             // 记录到数据库
-            if (_databaseService != null)
+            if (_moodLogRepository != null)
             {
-                _ = _databaseService.LogMoodChangeAsync(newMood, eventType);
+                _ = _moodLogRepository.LogMoodChangeAsync(newMood, eventType);
             }
         }
 
@@ -568,23 +586,29 @@ namespace MochiBot.Src.Agent
             return ("LocalLMStudio", modelFullName);
         }
 
-        /// <summary>获取对话模型名称（优先从当前子人格读取）</summary>
+        /// <summary>获取对话模型名称（从主人格读取 ChatModels）</summary>
         private (string provider, string model) GetChatModel()
         {
-            // 从当前子人格中获取模型
-            if (_currentSubPersonality?.ChatModels?.Count > 0)
+            // 从主人格获取模型
+            if (_personality?.ChatModels?.Count > 0)
             {
-                return ParseModelName(_currentSubPersonality.ChatModels[0]);
-            }
-
-            // fallback：从人格配置的第一个子人格获取
-            if (_personality?.Personalities?.Count > 0 &&
-                _personality.Personalities[0].ChatModels?.Count > 0)
-            {
-                return ParseModelName(_personality.Personalities[0].ChatModels[0]);
+                return ParseModelName(_personality.ChatModels[0]);
             }
 
             return ("LocalLMStudio", "default");
+        }
+
+        /// <summary>获取函数调用模型名称（从主人格读取 FunctionModels）</summary>
+        private (string provider, string model) GetFunctionModel()
+        {
+            // 从主人格获取函数调用模型
+            if (_personality?.FunctionModels?.Count > 0)
+            {
+                return ParseModelName(_personality.FunctionModels[0]);
+            }
+
+            // 如果没有配置 FunctionModels，回退到 ChatModels
+            return GetChatModel();
         }
 
         /// <summary>调用 LLM 对话模式</summary>
@@ -598,7 +622,7 @@ namespace MochiBot.Src.Agent
                 _ => new OpenAiUserChatMessage(m.Content)
             }).ToList();
 
-            return await _llmClient.SendChatAsync(openAiMessages);
+            return await _chatLlmClient.SendChatAsync(openAiMessages);
         }
 
         /// <summary>解析 LLM 响应，提取回复文本和 actions</summary>

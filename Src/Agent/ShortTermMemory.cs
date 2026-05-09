@@ -6,7 +6,6 @@ namespace MochiBot.Src.Agent
 {
     /// <summary>
     /// 短期记忆 - 环形缓冲区实现，固定容量，自动淘汰旧记录
-    /// 自管理 LlmClient，用于 SummarizeAsync 的真实 LLM 调用
     /// </summary>
     public class ShortTermMemory : IShortTermMemory
     {

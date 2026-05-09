@@ -1,16 +1,17 @@
 ﻿using System.IO;
 using Microsoft.Data.Sqlite;
-using MochiBot.Src.Core.Database.Models;
-using MochiBot.Src.EventModels;
 
 namespace MochiBot.Src.Core.Database
 {
     /// <summary>
-    /// 数据库业务层实现 - 基于 SQLite
+    /// 数据库服务实现 - 基于 SQLite
+    /// 仅负责连接字符串管理和统一建表，业务 SQL 由各 Repository 层负责
     /// </summary>
     public class DatabaseService : IDatabaseService
     {
         private readonly string _connectionString;
+
+        public string GetConnectionString() => _connectionString;
 
         public DatabaseService()
         {
@@ -29,11 +30,13 @@ namespace MochiBot.Src.Core.Database
         /// </summary>
         public DatabaseService(string connectionString)
         {
-            // 确保测试连接也禁用连接池，避免文件锁定
             _connectionString = connectionString.Contains("Pooling=") ? connectionString : $"{connectionString};Pooling=False";
             InitializeDatabase();
         }
 
+        /// <summary>
+        /// 统一建表，保证所有表结构完整
+        /// </summary>
         private void InitializeDatabase()
         {
             using var connection = new SqliteConnection(_connectionString);
@@ -52,7 +55,7 @@ namespace MochiBot.Src.Core.Database
                 WindowPosX  INTEGER NOT NULL DEFAULT 100,
                 WindowPosY  INTEGER NOT NULL DEFAULT 100
             );
-        """;
+            """;
             cmd1.ExecuteNonQuery();
 
             // 聊天记录表
@@ -64,7 +67,7 @@ namespace MochiBot.Src.Core.Database
                 Content     TEXT NOT NULL,
                 Timestamp   TEXT NOT NULL
             );
-        """;
+            """;
             cmd2.ExecuteNonQuery();
 
             // 情绪日志表
@@ -76,171 +79,45 @@ namespace MochiBot.Src.Core.Database
                 Mood        INTEGER NOT NULL,
                 Trigger     TEXT NOT NULL
             );
-        """;
+            """;
             cmd3.ExecuteNonQuery();
 
-            // 确保用户配置有默认行
+            // 长期记忆表
             using var cmd4 = connection.CreateCommand();
-            cmd4.CommandText = "SELECT COUNT(*) FROM user_config";
-            var count = (long)(cmd4.ExecuteScalar() ?? 0);
+            cmd4.CommandText = """
+            CREATE TABLE IF NOT EXISTS long_memory (
+                id              TEXT PRIMARY KEY,
+                keyword1        TEXT NOT NULL,
+                keyword2        TEXT NOT NULL,
+                keyword3        TEXT NOT NULL,
+                description     TEXT NOT NULL,
+                event_timestamp TEXT NOT NULL,
+                importance      INTEGER NOT NULL DEFAULT 0,
+                created_at      TEXT NOT NULL,
+                last_accessed_at TEXT NOT NULL,
+                access_count    INTEGER NOT NULL DEFAULT 0
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_kw1 ON long_memory(keyword1);
+            CREATE INDEX IF NOT EXISTS idx_kw2 ON long_memory(keyword2);
+            CREATE INDEX IF NOT EXISTS idx_kw3 ON long_memory(keyword3);
+            CREATE INDEX IF NOT EXISTS idx_importance ON long_memory(importance);
+            """;
+            cmd4.ExecuteNonQuery();
+
+            // 确保用户配置有默认行
+            using var cmd5 = connection.CreateCommand();
+            cmd5.CommandText = "SELECT COUNT(*) FROM user_config";
+            var count = (long)(cmd5.ExecuteScalar() ?? 0);
             if (count == 0)
             {
                 using var insert = connection.CreateCommand();
                 insert.CommandText = """
                 INSERT INTO user_config (Name, Personality, Opacity, MurmurEnabled, MurmurInterval, WindowPosX, WindowPosY)
                 VALUES ('小可爱', '温柔', 1.0, 1, 30, 100, 100);
-            """;
+                """;
                 insert.ExecuteNonQuery();
             }
-        }
-
-        // ========== 用户配置 ==========
-
-        public async Task<UserConfig> LoadConfigAsync()
-        {
-            await using var connection = new SqliteConnection(_connectionString);
-            await connection.OpenAsync();
-
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT Name, Personality, Opacity, MurmurEnabled, MurmurInterval, WindowPosX, WindowPosY FROM user_config WHERE Id = 1";
-
-            await using var reader = await cmd.ExecuteReaderAsync();
-            if (await reader.ReadAsync())
-            {
-                return new UserConfig
-                {
-                    Name = reader.GetString(0),
-                    Personality = reader.GetString(1),
-                    Opacity = reader.GetDouble(2),
-                    MurmurEnabled = reader.GetInt32(3) == 1,
-                    MurmurInterval = reader.GetInt32(4),
-                    WindowPosX = reader.GetInt32(5),
-                    WindowPosY = reader.GetInt32(6)
-                };
-            }
-
-            return new UserConfig();
-        }
-
-        public async Task SaveConfigAsync(UserConfig config)
-        {
-            await using var connection = new SqliteConnection(_connectionString);
-            await connection.OpenAsync();
-
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = """
-            UPDATE user_config SET
-                Name = @Name,
-                Personality = @Personality,
-                Opacity = @Opacity,
-                MurmurEnabled = @MurmurEnabled,
-                MurmurInterval = @MurmurInterval,
-                WindowPosX = @WindowPosX,
-                WindowPosY = @WindowPosY
-            WHERE Id = 1
-        """;
-
-            cmd.Parameters.AddWithValue("@Name", config.Name);
-            cmd.Parameters.AddWithValue("@Personality", config.Personality);
-            cmd.Parameters.AddWithValue("@Opacity", config.Opacity);
-            cmd.Parameters.AddWithValue("@MurmurEnabled", config.MurmurEnabled ? 1 : 0);
-            cmd.Parameters.AddWithValue("@MurmurInterval", config.MurmurInterval);
-            cmd.Parameters.AddWithValue("@WindowPosX", config.WindowPosX);
-            cmd.Parameters.AddWithValue("@WindowPosY", config.WindowPosY);
-
-            await cmd.ExecuteNonQueryAsync();
-        }
-
-        // ========== 聊天记录 ==========
-
-        public async Task SaveChatHistoryAsync(List<ChatMessage> messages)
-        {
-            await using var connection = new SqliteConnection(_connectionString);
-            await connection.OpenAsync();
-
-            // 清空旧数据后批量插入
-            using var clearCmd = connection.CreateCommand();
-            clearCmd.CommandText = "DELETE FROM chat_history";
-            await clearCmd.ExecuteNonQueryAsync();
-
-            foreach (var msg in messages)
-            {
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = "INSERT INTO chat_history (Role, Content, Timestamp) VALUES (@Role, @Content, @Timestamp)";
-                cmd.Parameters.AddWithValue("@Role", msg.Role);
-                cmd.Parameters.AddWithValue("@Content", msg.Content);
-                cmd.Parameters.AddWithValue("@Timestamp", msg.Timestamp.ToString("O"));
-                await cmd.ExecuteNonQueryAsync();
-            }
-        }
-
-        public async Task<List<ChatMessage>> LoadChatHistoryAsync(int limit = 50)
-        {
-            var result = new List<ChatMessage>();
-
-            await using var connection = new SqliteConnection(_connectionString);
-            await connection.OpenAsync();
-
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT Role, Content, Timestamp FROM chat_history ORDER BY Id DESC LIMIT @Limit";
-            cmd.Parameters.AddWithValue("@Limit", limit);
-
-            await using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-            {
-                result.Add(new ChatMessage
-                {
-                    Role = reader.GetString(0),
-                    Content = reader.GetString(1),
-                    Timestamp = DateTime.Parse(reader.GetString(2))
-                });
-            }
-
-            // 反转回正序
-            result.Reverse();
-            return result;
-        }
-
-        // ========== 情绪日志 ==========
-
-        public async Task LogMoodChangeAsync(AgentMood mood, string trigger)
-        {
-            await using var connection = new SqliteConnection(_connectionString);
-            await connection.OpenAsync();
-
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = "INSERT INTO mood_log (Timestamp, Mood, Trigger) VALUES (@Timestamp, @Mood, @Trigger)";
-            cmd.Parameters.AddWithValue("@Timestamp", DateTime.Now.ToString("O"));
-            cmd.Parameters.AddWithValue("@Mood", (int)mood);
-            cmd.Parameters.AddWithValue("@Trigger", trigger);
-
-            await cmd.ExecuteNonQueryAsync();
-        }
-
-        public async Task<List<MoodLogEntry>> GetMoodLogAsync(DateTime start, DateTime end)
-        {
-            var result = new List<MoodLogEntry>();
-
-            await using var connection = new SqliteConnection(_connectionString);
-            await connection.OpenAsync();
-
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = "SELECT Timestamp, Mood, Trigger FROM mood_log WHERE Timestamp >= @Start AND Timestamp <= @End ORDER BY Timestamp DESC";
-            cmd.Parameters.AddWithValue("@Start", start.ToString("O"));
-            cmd.Parameters.AddWithValue("@End", end.ToString("O"));
-
-            await using var reader = await cmd.ExecuteReaderAsync();
-            while (await reader.ReadAsync())
-            {
-                result.Add(new MoodLogEntry
-                {
-                    Timestamp = DateTime.Parse(reader.GetString(0)),
-                    Mood = (AgentMood)reader.GetInt32(1),
-                    Trigger = reader.GetString(2)
-                });
-            }
-
-            return result;
         }
     }
 }

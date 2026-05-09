@@ -275,13 +275,8 @@ namespace MochiBot.Src.Core.Config
             if (personality == null)
                 return (new List<string>(), null);
 
-            var sub = personality.Personalities.FirstOrDefault(p =>
-                p.Name.Equals(subPersonalityName, StringComparison.OrdinalIgnoreCase));
-
-            if (sub == null)
-                return (new List<string>(), null);
-
-            return (sub.ChatModels, sub.VisionModels);
+            // 模型配置统一在主人格中管理
+            return (personality.ChatModels, personality.VisionModels);
         }
 
         // ========== 人物名称合法性检查 ==========

@@ -1,4 +1,7 @@
 using System.Windows;
+using MochiBot.Src.Core.Config;
+using MochiBot.Src.Core.Database;
+using MochiBot.Src.Services;
 using MochiBot.Src.UI;
 
 namespace MochiBot.Src.UI
@@ -12,8 +15,13 @@ namespace MochiBot.Src.UI
             // 初始化所有依赖
             Program.Initialize();
 
-            // 创建 MainWindow 并传入 EventDispatcher
-            var mainWindow = new MainWindow(Program.EventDispatcher);
+            // 创建数据库服务和 Repository
+            var configReader = ConfigReader.Instance;
+            var databaseService = new DatabaseService();
+            var userConfigRepository = new UserConfigRepository(databaseService);
+
+            // 创建 MainWindow 并传入依赖
+            var mainWindow = new MainWindow(Program.EventDispatcher, configReader, userConfigRepository);
             mainWindow.Show();
         }
 

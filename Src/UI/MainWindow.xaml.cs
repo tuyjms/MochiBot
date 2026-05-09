@@ -4,9 +4,12 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
+using MochiBot.Src.Core.Config;
+using MochiBot.Src.Core.Database;
 using MochiBot.Src.Core.Events;
 using MochiBot.Src.EventModels;
 using MochiBot.Src.Renderer;
+using MochiBot.Src.Services;
 
 namespace MochiBot.Src.UI
 {
@@ -15,15 +18,19 @@ namespace MochiBot.Src.UI
         private CharacterRenderer _renderer = new();
         private System.Windows.Threading.DispatcherTimer _timer = new();
         private IEventDispatcher _eventDispatcher;
+        private IConfigReader _configReader;
+        private UserConfigRepository? _userConfigRepository;
         private string? _replySubscriptionId;
         private string? _moodSubscriptionId;
 
         // 消息列表
         private ObservableCollection<ChatMessageItem> _messages = new();
 
-        public MainWindow(IEventDispatcher eventDispatcher)
+        public MainWindow(IEventDispatcher eventDispatcher, IConfigReader configReader, UserConfigRepository? userConfigRepository = null)
         {
             _eventDispatcher = eventDispatcher;
+            _configReader = configReader;
+            _userConfigRepository = userConfigRepository;
             InitializeComponent();
             Loaded += OnLoaded;
             messageList.ItemsSource = _messages;
@@ -232,6 +239,12 @@ namespace MochiBot.Src.UI
             chatBubble.Visibility = chatBubble.Visibility == Visibility.Visible
                 ? Visibility.Collapsed
                 : Visibility.Visible;
+        }
+
+        private void SettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            var settingsWindow = new SettingsWindow(_configReader, _eventDispatcher, this, _userConfigRepository);
+            settingsWindow.ShowDialog();
         }
     }
 
