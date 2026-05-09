@@ -1,7 +1,7 @@
 <Window x:Class="MochiBot.Src.UI.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="猫娘窗口" Height="700" Width="520"
+        Title="MochiBot"  Height="700" Width="520"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True"
         WindowStartupLocation="CenterScreen"
