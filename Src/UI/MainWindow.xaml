@@ -1,17 +1,17 @@
 <Window x:Class="MochiBot.Src.UI.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="MochiBot"  Height="700" Width="520"
+        Title="MochiBot"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True"
-        WindowStartupLocation="CenterScreen"
+        WindowStartupLocation="Manual"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
     <Grid>
-        <!-- 角色显示区域 -->
-        <Image x:Name="characterImage" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"
-               Margin="0,0,0,120"/>
+        <!-- 角色显示区域 - 填满整个窗口 -->
+        <Image x:Name="characterImage" Stretch="Uniform" 
+               HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
-        <!-- 气泡聊天框 -->
+        <!-- 气泡提示（浮在角色上方，可与角色重叠） -->
         <Border x:Name="chatBubble" 
                 Background="#CCFFFFFF" 
                 CornerRadius="12" 
@@ -19,67 +19,27 @@
                 BorderThickness="1"
                 HorizontalAlignment="Center" 
                 VerticalAlignment="Bottom" 
-                Margin="10,0,10,10"
-                MaxWidth="480"
-                Visibility="Collapsed">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <!-- 消息列表 -->
-                <ListBox x:Name="messageList" 
-                         Grid.Row="0"
-                         MaxHeight="200"
-                         Margin="8,8,8,0"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Border CornerRadius="10" 
-                                    Margin="2,4"
-                                    MaxWidth="350"
-                                    HorizontalAlignment="Left"
-                                    Background="#FFE8E8E8">
-                                <Border.Resources>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="TextWrapping" Value="Wrap"/>
-                                        <Setter Property="Margin" Value="8,6"/>
-                                        <Setter Property="FontSize" Value="14"/>
-                                    </Style>
-                                </Border.Resources>
-                                <TextBlock Text="{Binding Text}"/>
-                            </Border>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-
-                <!-- 输入区域 -->
-                <Grid Grid.Row="1" Margin="8,4,8,8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBox x:Name="inputBox" 
-                             Grid.Column="0"
-                             Height="32"
-                             FontSize="14"
-                             VerticalContentAlignment="Center"
-                             BorderBrush="#80CCCCCC"
-                             BorderThickness="1"
-                             Padding="8,0"
-                             KeyDown="InputBox_KeyDown"/>
-                    <Button x:Name="sendButton" 
-                            Grid.Column="1"
-                            Content="发送" 
-                            Width="50" 
-                            Height="32" 
-                            Margin="6,0,0,0"
-                            FontSize="13"
-                            Click="SendButton_Click"/>
-                </Grid>
+                Margin="10,0,10,60"
+                MaxWidth="360"
+                Visibility="Collapsed"
+                MouseDown="Bubble_Click">
+            <Grid Margin="10,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <!-- 小头像 -->
+                <Border Grid.Column="0" Width="24" Height="24" CornerRadius="12" Background="#FFE8D5C4"
+                        VerticalAlignment="Center" Margin="0,0,8,0">
+                    <TextBlock Text="小" FontSize="11" FontWeight="Bold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="#FF8B6F5E"/>
+                </Border>
+                <!-- 消息预览 -->
+                <TextBlock Grid.Column="1" x:Name="bubbleText" 
+                           Text="" FontSize="13" Foreground="#FF333333"
+                           TextWrapping="Wrap" MaxHeight="48"
+                           VerticalAlignment="Center"/>
             </Grid>
         </Border>
 

@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
@@ -10,6 +9,7 @@ using MochiBot.Src.Core.Events;
 using MochiBot.Src.EventModels;
 using MochiBot.Src.Renderer;
 using MochiBot.Src.Services;
+using EventTrigger = MochiBot.Src.EventModels.EventTrigger;
 
 namespace MochiBot.Src.UI
 {
@@ -20,11 +20,11 @@ namespace MochiBot.Src.UI
         private IEventDispatcher _eventDispatcher;
         private IConfigReader _configReader;
         private UserConfigRepository? _userConfigRepository;
-        private string? _replySubscriptionId;
         private string? _moodSubscriptionId;
+        private ChatWindow? _chatWindow;
 
-        // 消息列表
-        private ObservableCollection<ChatMessageItem> _messages = new();
+        // 最新一条 agent 消息（用于气泡显示）
+        private string? _latestAgentMessage;
 
         public MainWindow(IEventDispatcher eventDispatcher, IConfigReader configReader, UserConfigRepository? userConfigRepository = null)
         {
@@ -33,7 +33,13 @@ namespace MochiBot.Src.UI
             _userConfigRepository = userConfigRepository;
             InitializeComponent();
             Loaded += OnLoaded;
-            messageList.ItemsSource = _messages;
+
+            // 设置窗口位置：桌面右下角，高度占1/3，宽度按角色图片比例 512:689 缩放
+            var workArea = SystemParameters.WorkArea;
+            Height = workArea.Height / 3.0;
+            Width = Height * (512.0 / 689.0); // 角色图片宽高比 512:689
+            Left = workArea.Right - Width;
+            Top = workArea.Bottom - Height;
         }
 
         private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -65,8 +71,11 @@ namespace MochiBot.Src.UI
                 _timer.Tick += (s, args) => UpdateImage();
                 _timer.Start();
 
-                // 订阅回复事件
-                SubscribeToReplyEvents();
+                // 订阅情绪事件
+                SubscribeToMoodEvents();
+
+                // 创建聊天窗口（延迟创建，避免影响启动速度）
+                CreateChatWindow();
             }
             catch (Exception ex)
             {
@@ -75,40 +84,62 @@ namespace MochiBot.Src.UI
         }
 
         /// <summary>
-        /// 订阅 Agent 发布的回复事件
+        /// 创建聊天窗口实例
         /// </summary>
-        private void SubscribeToReplyEvents()
+        private void CreateChatWindow()
+        {
+            _chatWindow = new ChatWindow(_eventDispatcher, _configReader);
+            _chatWindow.NewAgentMessage += OnChatWindowNewMessage;
+
+            // 设置 Owner 使聊天窗口在主窗口之上
+            _chatWindow.Owner = this;
+        }
+
+        /// <summary>
+        /// 聊天窗口收到新消息时更新主窗口气泡
+        /// </summary>
+        private void OnChatWindowNewMessage()
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (_chatWindow != null)
+                {
+                    _latestAgentMessage = _chatWindow.LatestAgentMessage;
+                    UpdateBubbleText();
+
+                    // 如果聊天窗口未打开，显示气泡
+                    if (_chatWindow.Visibility != Visibility.Visible)
+                    {
+                        chatBubble.Visibility = Visibility.Visible;
+                    }
+                }
+            });
+        }
+
+        /// <summary>
+        /// 更新气泡文本
+        /// </summary>
+        private void UpdateBubbleText()
+        {
+            if (!string.IsNullOrEmpty(_latestAgentMessage))
+            {
+                // 截取前 50 个字符作为气泡预览
+                var preview = _latestAgentMessage.Length > 50
+                    ? _latestAgentMessage[..50] + "..."
+                    : _latestAgentMessage;
+                bubbleText.Text = preview;
+            }
+        }
+
+        /// <summary>
+        /// 订阅情绪变化事件
+        /// </summary>
+        private void SubscribeToMoodEvents()
         {
             try
             {
                 if (_eventDispatcher != null)
                 {
-                    _replySubscriptionId = _eventDispatcher.Subscribe(EventCategory.ToolResult, (eventData) =>
-                    {
-                        try
-                        {
-                            using var doc = JsonDocument.Parse(eventData.Info);
-                            if (doc.RootElement.TryGetProperty("type", out var typeProp))
-                            {
-                                var type = typeProp.GetString();
-                                if (type == "reply")
-                                {
-                                    var content = doc.RootElement.TryGetProperty("content", out var contentProp)
-                                        ? contentProp.GetString() ?? ""
-                                        : "";
-                                    if (!string.IsNullOrEmpty(content))
-                                    {
-                                        Dispatcher.Invoke(() =>
-                                        {
-                                            AddMessage("小琪", content);
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                        catch { }
-                    });
-
                     _moodSubscriptionId = _eventDispatcher.Subscribe(EventCategory.MoodChange, (eventData) =>
                     {
                         try
@@ -142,55 +173,10 @@ namespace MochiBot.Src.UI
             catch { }
         }
 
-        /// <summary>
-        /// 添加消息到气泡列表
-        /// </summary>
-        private void AddMessage(string sender, string text)
-        {
-            _messages.Add(new ChatMessageItem { Sender = sender, Text = text });
-
-            // 自动滚动到底部
-            if (messageList.Items.Count > 0)
-            {
-                messageList.ScrollIntoView(messageList.Items[messageList.Items.Count - 1]);
-            }
-
-            // 如果聊天框未打开，自动显示气泡提示
-            if (chatBubble.Visibility != Visibility.Visible)
-            {
-                chatBubble.Visibility = Visibility.Visible;
-            }
-        }
-
-        /// <summary>
-        /// 发送用户消息
-        /// </summary>
-        private void SendMessage()
-        {
-            var text = inputBox.Text.Trim();
-            if (string.IsNullOrEmpty(text)) return;
-
-            // 显示用户消息
-            AddMessage("我", text);
-            inputBox.Clear();
-
-            // 发布用户输入事件，触发 Agent 处理
-            if (_eventDispatcher != null)
-            {
-                _eventDispatcher.Publish(new EventData
-                {
-                    Category = EventCategory.UserInput,
-                    Trigger = EventModels.EventTrigger.User,
-                    Info = text
-                });
-            }
-        }
-
         // ========== 事件处理 ==========
 
         private void OnFrameUpdated()
         {
-            // DispatcherTimer 已在 UI 线程上运行，直接触发刷新
             UpdateImage();
         }
 
@@ -216,29 +202,30 @@ namespace MochiBot.Src.UI
 
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            // 允许拖动窗口
             DragMove();
-        }
-
-        private void SendButton_Click(object sender, RoutedEventArgs e)
-        {
-            SendMessage();
-        }
-
-        private void InputBox_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Enter)
-            {
-                SendMessage();
-                e.Handled = true;
-            }
         }
 
         private void ToggleChatButton_Click(object sender, RoutedEventArgs e)
         {
-            chatBubble.Visibility = chatBubble.Visibility == Visibility.Visible
-                ? Visibility.Collapsed
-                : Visibility.Visible;
+            if (_chatWindow == null) return;
+
+            if (_chatWindow.Visibility == Visibility.Visible)
+            {
+                _chatWindow.Hide();
+            }
+            else
+            {
+                _chatWindow.Show();
+                _chatWindow.Activate();
+                // 隐藏主窗口气泡
+                chatBubble.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void Bubble_Click(object sender, RoutedEventArgs e)
+        {
+            // 点击气泡打开聊天窗口
+            ToggleChatButton_Click(sender, e);
         }
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
@@ -246,14 +233,5 @@ namespace MochiBot.Src.UI
             var settingsWindow = new SettingsWindow(_configReader, _eventDispatcher, this, _userConfigRepository);
             settingsWindow.ShowDialog();
         }
-    }
-
-    /// <summary>
-    /// 聊天消息项
-    /// </summary>
-    public class ChatMessageItem
-    {
-        public string Sender { get; set; } = "";
-        public string Text { get; set; } = "";
     }
 }
