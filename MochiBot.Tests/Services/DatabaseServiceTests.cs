@@ -1,5 +1,5 @@
-﻿using MochiBot.Src.Core.Database;
-using MochiBot.Src.Core.Models;
+using MochiBot.Src.Core.Database;
+using MochiBot.Src.Core.Database.Models;
 using MochiBot.Src.EventModels;
 namespace MochiBot.Tests;
 

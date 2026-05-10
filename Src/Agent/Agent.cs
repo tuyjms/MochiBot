@@ -22,10 +22,9 @@ namespace MochiBot.Src.Agent
     {
         private readonly IEventDispatcher _eventDispatcher;
         private readonly IConfigReader _configReader;
-        private LlmClient _chatLlmClient;      // 对话模型（ChatModels）
-        private LlmClient _functionLlmClient;  // 函数调用模型（FunctionModels，用于摘要、关键词提取等）
-        private readonly IShortTermMemory _shortTermMemory;
-        private readonly ILongMemory _longMemory;
+        private LlmClient _chatLlmClient;
+        private IShortTermMemory _shortTermMemory;
+        private ILongMemory _longMemory;
         private readonly IToolService _toolService;
         private readonly MoodLogRepository? _moodLogRepository;
         private AppSettings _appSettings;
@@ -38,12 +37,14 @@ namespace MochiBot.Src.Agent
         // ========== 心情记录器（集成到 Agent 内部） ==========
         private AgentMood _currentMood = AgentMood.Neutral;
 
-        private readonly ActionExecutor _actionExecutor;
+        private ActionExecutor _actionExecutor;
         private readonly PromptFormatter _systemPromptFormatter;
         private readonly PromptFormatter _userContextFormatter;
         private bool _isProcessing;
         private string _lastEvent = string.Empty;
         private string _lastJsonError = string.Empty;
+        private string _functionProviderName = string.Empty;
+        private string _functionModelName = string.Empty;
 
         // 对话模式 System Prompt 模板（固定模板，人格提示词动态注入）
         private const string SystemPromptTemplate = @"
@@ -84,18 +85,16 @@ namespace MochiBot.Src.Agent
             // 选择当前子人格（按权重概率）
             _currentSubPersonality = SelectSubPersonalityByWeight();
 
-            // 自创建 LlmClient（对话模型 + 函数调用模型）
+            // 自创建 LlmClient（对话模型）
             _chatLlmClient = CreateChatLlmClient();
-            _functionLlmClient = CreateFunctionLlmClient();
+            ResolveFunctionModel();
 
-            // 自创建 ShortTermMemory（使用函数调用模型）
+            // 自创建 ShortTermMemory（使用函数调用模型，自维护LlmClient）
             var maxMessages = _personality?.MaxMessages ?? 50;
-            _shortTermMemory = new ShortTermMemory(maxMessages, _configReader);
-            _shortTermMemory.SetLlmClient(_functionLlmClient);
+            _shortTermMemory = new ShortTermMemory(maxMessages, _functionProviderName, _functionModelName, _configReader);
 
-            // 自创建 LongMemory（使用函数调用模型）
-            _longMemory = new LongMemory(_configReader);
-            _longMemory.SetLlmClient(_functionLlmClient);
+            // 自创建 LongMemory（使用函数调用模型，自维护LlmClient）
+            _longMemory = new LongMemory(_functionProviderName, _functionModelName, _configReader);
 
             // 创建 ActionExecutor，将 actions 执行逻辑委托给它
             _actionExecutor = new ActionExecutor(
@@ -184,10 +183,28 @@ namespace MochiBot.Src.Agent
                 if (items.Contains("ProviderConfig"))
                 {
                     _chatLlmClient = CreateChatLlmClient();
-                    _functionLlmClient = CreateFunctionLlmClient();
-                    _shortTermMemory.SetLlmClient(_functionLlmClient);
-                    _longMemory.SetLlmClient(_functionLlmClient);
-                    _configReader.Logger.Info("[Agent] ProviderConfig 已变更，LlmClient 已重建");
+                    ResolveFunctionModel();
+
+                    var maxMessages = _personality?.MaxMessages ?? 50;
+                    _shortTermMemory = new ShortTermMemory(maxMessages, _functionProviderName, _functionModelName, _configReader);
+                    _longMemory = new LongMemory(_functionProviderName, _functionModelName, _configReader);
+
+                    _actionExecutor = new ActionExecutor(
+                        _toolService,
+                        mood => ChangeMoodByEvent(mood.ToString()),
+                        (desc, param) => _shortTermMemory.AddMessage("system", $"[中期记忆] {desc}"),
+                        anim =>
+                        {
+                            _lastEvent = $"animation:{anim}";
+                            _eventDispatcher.Publish(new EventData
+                            {
+                                Category = EventCategory.MoodChange,
+                                Trigger = EventTrigger.Tool,
+                                Info = JsonSerializer.Serialize(new { animation = anim, source = "tool" })
+                            });
+                        });
+
+                    _configReader.Logger.Info("[Agent] ProviderConfig 已变更，所有 LlmClient 和记忆模块已重建");
                 }
 
                 // 检查人格配置是否变更（刷新人格描述）
@@ -255,11 +272,12 @@ namespace MochiBot.Src.Agent
         }
 
         /// <summary>创建函数调用模型 LlmClient（FunctionModels，用于摘要、关键词提取等后台任务）</summary>
-        private LlmClient CreateFunctionLlmClient()
+        private void ResolveFunctionModel()
         {
             var (provider, model) = GetFunctionModel();
-            _configReader.Logger.Info($"[Agent] 创建函数调用 LlmClient: Provider={provider}, Model={model}");
-            return new LlmClient(provider, model, _configReader);
+            _functionProviderName = provider;
+            _functionModelName = model;
+            _configReader.Logger.Info($"[Agent] 解析函数调用模型: Provider={provider}, Model={model}");
         }
 
         // ========== 心情记录器（集成到 Agent 内部） ==========
