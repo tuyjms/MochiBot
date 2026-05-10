@@ -13,12 +13,13 @@ namespace MochiBot.Src.Agent
     {
         private readonly LongMemoryRepository _repository;
         private readonly IConfigReader _configReader;
-        private LlmClient? _llmClient;
+        private readonly LlmClient _llmClient;
         private readonly Random _random = new();
 
-        public LongMemory(IConfigReader configReader, IDatabaseService? databaseService = null)
+        public LongMemory(string provider, string model, IConfigReader configReader, IDatabaseService? databaseService = null)
         {
             _configReader = configReader ?? throw new ArgumentNullException(nameof(configReader));
+            _llmClient = new LlmClient(provider, model, configReader);
 
             var dbService = databaseService ?? new DatabaseService();
             _repository = new LongMemoryRepository(dbService);
@@ -28,18 +29,13 @@ namespace MochiBot.Src.Agent
         /// <summary>
         /// 可注入自定义连接字符串的构造函数（用于单元测试）
         /// </summary>
-        public LongMemory(string connectionString, IConfigReader configReader)
+        public LongMemory(string connectionString, string provider, string model, IConfigReader configReader)
         {
             _configReader = configReader ?? throw new ArgumentNullException(nameof(configReader));
+            _llmClient = new LlmClient(provider, model, configReader);
             var dbService = new DatabaseService(connectionString);
             _repository = new LongMemoryRepository(dbService);
             _repository.InitializeTable();
-        }
-
-        /// <summary>设置或更新 LlmClient 实例（用于热重载时重建）</summary>
-        public void SetLlmClient(LlmClient llmClient)
-        {
-            _llmClient = llmClient;
         }
 
         public async Task AddEntryAsync(LongMemoryEntry entry)
@@ -202,6 +198,45 @@ namespace MochiBot.Src.Agent
                 LastAccessedAt = DateTime.Parse(model.LastAccessedAt),
                 AccessCount = model.AccessCount
             };
+        }
+
+        public async Task SummarizeShortTermAsync(IShortTermMemory shortTermMemory)
+        {
+            var messages = shortTermMemory.GetAllMessages();
+            if (messages.Count == 0) return;
+
+            var chatHistory = string.Join("\n", messages.Select(m => $"{m.Role}: {m.Content}"));
+
+            try
+            {
+                var prompt = $"请从以下对话中提取关键事件信息，返回格式：\n关键词1,关键词2,关键词3\n事件描述\n\n{chatHistory}";
+                var response = await _llmClient.SendChatAsync(prompt);
+
+                var lines = response.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                var keywords = lines.Length > 0 ? lines[0].Split(',', StringSplitOptions.TrimEntries) : Array.Empty<string>();
+                var description = lines.Length > 1 ? lines[1] : response[..Math.Min(200, response.Length)];
+
+                var entry = new LongMemoryEntry
+                {
+                    Id = $"mem_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid():N}",
+                    Keyword1 = keywords.Length > 0 ? keywords[0] : "event",
+                    Keyword2 = keywords.Length > 1 ? keywords[1] : "event",
+                    Keyword3 = keywords.Length > 2 ? keywords[2] : "event",
+                    Description = description,
+                    EventTimestamp = DateTime.Now,
+                    Importance = 10,
+                    CreatedAt = DateTime.Now,
+                    LastAccessedAt = DateTime.Now,
+                    AccessCount = 0
+                };
+
+                await AddEntryAsync(entry);
+                _configReader.Logger.Info($"[LongMemory] 从短期记忆总结并存入中期记忆: {entry.Description[..Math.Min(50, entry.Description.Length)]}...");
+            }
+            catch (Exception ex)
+            {
+                _configReader.Logger.Warn($"[LongMemory] 从短期记忆总结失败: {ex.Message}");
+            }
         }
     }
 }

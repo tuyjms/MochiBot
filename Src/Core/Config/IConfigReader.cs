@@ -1,4 +1,4 @@
-﻿using MochiBot.Src.Core.Config.Models;
+using MochiBot.Src.Core.Config.Models;
 using MochiBot.Src.Core.Events;
 
 namespace MochiBot.Src.Core.Config
@@ -62,6 +62,15 @@ namespace MochiBot.Src.Core.Config
 
         /// <summary>获取所有内置定时任务配置</summary>
         List<CronTask> GetCronTasks();
+
+
+        // ========== 配置写入 ==========
+
+        /// <summary>保存应用设置到 appsettings.json 并发布 ConfigChanged 事件</summary>
+        void SaveAppSettings(AppSettings newSettings);
+
+        /// <summary>保存激活人格名称到 appsettings.json</summary>
+        void SaveActivePersonality(string personalityName);
 
 
         // ========== 配置重载 ==========

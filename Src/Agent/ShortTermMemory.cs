@@ -1,4 +1,4 @@
-﻿using MochiBot.Src.Core.Config;
+using MochiBot.Src.Core.Config;
 using MochiBot.Src.EventModels;
 using MochiBot.Src.Services;
 
@@ -21,13 +21,24 @@ namespace MochiBot.Src.Agent
         private const int DefaultCapacity = 50;
         private const int SummaryReservedCount = 10;
 
-        public ShortTermMemory(int capacity = DefaultCapacity, IConfigReader? configReader = null)
+        public ShortTermMemory(int capacity, string provider, string model, IConfigReader configReader)
         {
+            _configReader = configReader;
             _capacity = capacity > 0 ? capacity : DefaultCapacity;
             _buffer = new ChatMessage[_capacity];
             _head = 0;
             _count = 0;
-            _configReader = configReader ?? ConfigReader.Instance;
+            _llmClient = new LlmClient(provider, model, configReader);
+        }
+
+        /// <summary>用于单元测试的构造函数（不创建 LlmClient）</summary>
+        public ShortTermMemory(int capacity = DefaultCapacity)
+        {
+            _configReader = ConfigReader.Instance;
+            _capacity = capacity > 0 ? capacity : DefaultCapacity;
+            _buffer = new ChatMessage[_capacity];
+            _head = 0;
+            _count = 0;
         }
 
         public int Count => _count;
@@ -59,14 +70,6 @@ namespace MochiBot.Src.Agent
         }
 
         public string? ContextSummary => _contextSummary;
-
-        /// <summary>
-        /// 设置或更新 LlmClient 实例（用于热重载时重建）
-        /// </summary>
-        public void SetLlmClient(LlmClient llmClient)
-        {
-            _llmClient = llmClient;
-        }
 
         public void AddMessage(string role, string content)
         {

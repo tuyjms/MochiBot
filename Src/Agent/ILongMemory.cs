@@ -1,5 +1,4 @@
 using MochiBot.Src.EventModels;
-using MochiBot.Src.Services;
 
 namespace MochiBot.Src.Agent
 {
@@ -56,7 +55,7 @@ namespace MochiBot.Src.Agent
         /// <summary>淘汰机制：删除重要度低于阈值且长期未访问的条目</summary>
         Task EvictEntriesAsync(int minImportance, int maxInactiveDays);
 
-        /// <summary>设置或更新 LlmClient 实例（用于热重载时重建）</summary>
-        void SetLlmClient(LlmClient llmClient);
+        /// <summary>传入短期记忆，LLM总结事件并存入中期记忆</summary>
+        Task SummarizeShortTermAsync(IShortTermMemory shortTermMemory);
     }
 }

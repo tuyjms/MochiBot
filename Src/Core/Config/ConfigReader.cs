@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using MochiBot.Src.Core.Config.Models;
@@ -277,6 +277,57 @@ namespace MochiBot.Src.Core.Config
 
             // 模型配置统一在主人格中管理
             return (personality.ChatModels, personality.VisionModels);
+        }
+
+        // ========== 配置写入 ==========
+
+        /// <summary>
+        /// 保存应用设置到 appsettings.json 并刷新缓存
+        /// </summary>
+        public void SaveAppSettings(AppSettings newSettings)
+        {
+            try
+            {
+                var json = File.ReadAllText(_configPath);
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                var dict = new Dictionary<string, object?>();
+
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.Name == "AppSettings")
+                    {
+                        dict["AppSettings"] = newSettings;
+                    }
+                    else
+                    {
+                        dict[prop.Name] = JsonSerializer.Deserialize<object>(prop.Value.GetRawText());
+                    }
+                }
+
+                var newJson = JsonSerializer.Serialize(dict, options);
+                File.WriteAllText(_configPath, newJson);
+
+                Reload();
+                Logger.Info("[ConfigReader] 应用设置已保存");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("[ConfigReader] 保存应用设置失败", ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 保存激活人格名称到 appsettings.json
+        /// </summary>
+        public void SaveActivePersonality(string personalityName)
+        {
+            var settings = GetAppSettings();
+            settings.ActivePersonality = personalityName;
+            SaveAppSettings(settings);
         }
 
         // ========== 人物名称合法性检查 ==========

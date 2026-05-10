@@ -1,4 +1,4 @@
-﻿using MochiBot.Src.EventModels;
+using MochiBot.Src.EventModels;
 using MochiBot.Src.Services;
 
 namespace MochiBot.Src.Agent
@@ -47,7 +47,5 @@ namespace MochiBot.Src.Agent
         /// <summary>手动触发LLM总结（将旧记忆压缩为摘要）</summary>
         Task<string> SummarizeAsync();
 
-        /// <summary>设置或更新 LlmClient 实例（用于热重载时重建）</summary>
-        void SetLlmClient(LlmClient llmClient);
     }
 }
