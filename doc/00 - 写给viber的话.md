@@ -51,7 +51,7 @@
 1. **发起协商**：在对应模块的 md 文档中描述新增配置项的名称、类型、默认值、用途
 2. **注册到配置读取器**：在 `doc/08-配置读取器.md` 中更新数据模型和 `appsettings.json` 结构
 3. **实现代码**：在 `ConfigReader.cs` 中添加对应的属性或方法
-4. **更新文档**：同步更新 `doc/01-项目架构总览.md` 和 `doc/11-接口调用关系与协作图.md`
+4. **更新文档**：同步更新 `doc/01-项目架构总览.md`
 
 > 禁止在各模块中直接硬编码配置参数，所有软件配置必须走 ConfigReader 统一流程。
 
@@ -81,31 +81,33 @@
 
 ### 测试项目结构
 
-测试项目位于 `Mochi.Tests/` 目录下，使用 xUnit 框架 + SQLite 文件数据库（每个测试用例独立文件，自动清理）。测试文件按服务类别分文件夹存放。
+测试项目位于 `MochiBot.Tests/` 目录下，使用 xUnit 框架 + SQLite 文件数据库（每个测试用例独立文件，自动清理）。测试文件按服务类别分文件夹存放。
 
 ```txt
-Mochi.Tests/
-├── Mochi.SrcTests.csproj    # 测试项目配置
+MochiBot.Tests/
+├── MochiBot.Tests.csproj         # 测试项目配置
 ├── Services/                     # 服务层测试
 │   ├── DatabaseServiceTests.cs   # 数据库业务层测试
 │   └── ConfigReaderTests.cs      # 配置读取器测试
-└── Models/                       # 模型测试（预留）
+├── Events/                       # 事件系统测试
+├── Renderer/                     # 渲染器测试
+└── Models/                       # 模型测试
 ```
 
 ### 运行测试
 
 ```bash
 # 运行所有测试
-dotnet test Mochi.SrcTests/Mochi.Tests.csproj
+dotnet test MochiBot.Tests/MochiBot.Tests.csproj
 
 # 运行指定测试类（按名称筛选）
-dotnet test Mochi.SrcTests/Mochi.Tests.csproj --filter "FullyQualifiedName~DatabaseServiceTests"
+dotnet test MochiBot.Tests/MochiBot.Tests.csproj --filter "FullyQualifiedName~DatabaseServiceTests"
 ```
 
 ### 编写测试的注意事项
 
-1. **测试项目引用主项目**：`Mochi.Tests.csproj` 已通过 `<ProjectReference>` 引用主项目，可直接使用主项目的类和接口
-2. **主项目排除测试文件**：`Mochi.csproj` 中已添加 `<Compile Remove="Mochi.Tests\**\*.cs" />`，避免主项目编译时误编译测试文件
+1. **测试项目引用主项目**：`MochiBot.Tests.csproj` 已通过 `<ProjectReference>` 引用主项目，可直接使用主项目的类和接口
+2. **主项目排除测试文件**：`MochiBot.csproj` 中已添加 `<Compile Remove="MochiBot.Tests\**\*.cs" />`，避免主项目编译时误编译测试文件
 3. **SQLite 连接池**：测试连接字符串需添加 `Pooling=False`，确保每个测试用例的数据库文件可被正确清理
 4. **文件清理**：`Dispose()` 中使用 `try/catch` 包裹文件删除，避免因文件锁定导致测试失败
 5. **独立数据库文件**：每个测试用例使用 `Guid.NewGuid()` 生成唯一文件名，避免并行测试冲突

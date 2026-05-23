@@ -40,12 +40,12 @@ Agent 是系统的**大脑**和，负责协调所有子模块。它订阅事件�
 
 ### 1. 处理用户输入
 
-1. 事件调度器分发 UserMessage 事件
+1. 事件调度器分发 UserInput 事件
 2. Agent 接收事件，短期记忆.AddMessage("user", message)
 3. 构建完整 Prompt（含长期记忆检索）
 4. LlmClient.SendChatAsync() 对话模式调用
 5. 解析 LLM 响应：提取 reply 文本 + 解析 actions 数组
-6. 遍历执行 actions：tool_call → ToolManager、mood_change → SetMood()、animation → Renderer
+6. 遍历执行 actions：tool_call → ToolService、mood_change → SetMood()、animation → Renderer
 7. 短期记忆.AddMessage("assistant", reply)
 8. 检查短期记忆是否溢出，溢出时调用函数模式评估重要度后录入 LongMemory
 9. 根据用户消息关键词和时间自动检测情绪变化（DetectAndTriggerMoodEvent）
@@ -53,7 +53,7 @@ Agent 是系统的**大脑**和，负责协调所有子模块。它订阅事件�
 
 ### 2. 处理自动事件
 
-1. AutoEventService 定时器触发，发布 SystemAuto 事件
+1. EventDispatcher（定时任务） 定时器触发，发布 SystemAuto 事件
 2. Agent 接收事件，根据 EventType 构建对应 Prompt
 3. LlmClient.SendChatAsync() 对话模式调用
 4. 解析 LLM 响应，执行 actions
@@ -69,11 +69,11 @@ Agent 是系统的**大脑**和，负责协调所有子模块。它订阅事件�
 
 ## 依赖关系
 
-Agent 依赖：LlmClient, PromptFormatter, ShortTermMemory, ToolManager, ICharacterRenderer, IDatabaseService
+Agent 依赖：LlmClient, PromptFormatter, ShortTermMemory, LongMemory, ToolService, ICharacterRenderer, IDatabaseService
 
 **不依赖**：IAgentMoodTracker（已内联到 Agent 内部）
 
-依赖 Agent：Form1（UI层）, AutoEventService
+依赖 Agent：Form1（UI层）, EventDispatcher（定时任务）
 
 ## 关于单元测试
 

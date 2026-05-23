@@ -29,7 +29,7 @@
 ## 依赖关系
 
 - **依赖**: 无（纯字符串替换工具）
-- **被依赖**: 所有需要构建 prompt 的模块（Agent、AutoEventService、ToolService 等）
+- **被依赖**: 所有需要构建 prompt 的模块（Agent、ToolService 等）
 
 ## 单元测试
 
