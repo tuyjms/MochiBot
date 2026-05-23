@@ -40,6 +40,9 @@ bld/
 .vscode
 .clinerules
 
+# claude code
+.claude/
+
 # JetBrains Rider
 .idea/
 *.sln.iml
@@ -84,6 +87,9 @@ mywork.md
 # 文档生成
 doc/.vitepress/dist/
 doc/node_modules/
+
+# 第三方参考项目
+SystemAnimatorOnline/
 
 # 资源文件（保留目录结构，忽略具体内容）
 Resources/Data/*.json

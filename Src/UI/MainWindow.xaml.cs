@@ -182,7 +182,7 @@ namespace MochiBot.Src.UI
 
         private void OnFrameUpdated()
         {
-            UpdateImage();
+            Dispatcher.BeginInvoke(new Action(() => UpdateImage()));
         }
 
         private void UpdateImage()
@@ -231,6 +231,15 @@ namespace MochiBot.Src.UI
         {
             // 点击气泡打开聊天窗口
             ToggleChatButton_Click(sender, e);
+        }
+
+        private void VrmViewerButton_Click(object sender, RoutedEventArgs e)
+        {
+            var vrmWindow = new VrmViewerWindow(_configReader)
+            {
+                Owner = this
+            };
+            vrmWindow.Show();
         }
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)

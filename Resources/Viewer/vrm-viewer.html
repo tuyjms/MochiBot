@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VRM Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+  canvas { display: block; }
+  #status {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    color: #ccc; font-size: 16px; text-align: center; pointer-events: none;
+    transition: opacity 0.5s; z-index: 10;
+  }
+  #status.error { color: #ff6b6b; }
+  .spinner {
+    display: inline-block; width: 32px; height: 32px; margin-bottom: 12px;
+    border: 3px solid rgba(255,255,255,0.2); border-top-color: #fff;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #info {
+    position: absolute; top: 8px; left: 8px; color: #aaa; font-size: 11px;
+    background: rgba(0,0,0,0.55); padding: 8px 10px; border-radius: 4px;
+    pointer-events: none; z-index: 5; max-width: 300px; line-height: 1.6;
+  }
+  #controls {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; z-index: 5; flex-wrap: wrap; justify-content: center;
+  }
+  #controls button {
+    background: rgba(255,255,255,0.1); color: #ccc; border: 1px solid rgba(255,255,255,0.2);
+    padding: 6px 14px; border-radius: 16px; cursor: pointer; font-size: 12px;
+    transition: all 0.2s;
+  }
+  #controls button:hover { background: rgba(255,255,255,0.2); }
+  #controls button.on { background: rgba(100,180,255,0.3); border-color: rgba(100,180,255,0.6); color: #fff; }
+  #mood {
+    position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+    color: #fff; font-size: 14px; pointer-events: none; z-index: 5;
+    background: rgba(0,0,0,0.5); padding: 4px 14px; border-radius: 12px;
+    transition: opacity 0.5s;
+  }
+</style>
+</head>
+<body>
+<div id="status"><div class="spinner"></div><div>Loading VRM model...</div></div>
+<div id="info"></div>
+<div id="mood"></div>
+<div id="controls">
+  <button id="btnIdle" class="on">Idle Bone</button>
+  <button id="btnBlink" class="on">Blink</button>
+  <button id="btnMood" class="on">Mood</button>
+  <button id="btnLook" class="on">Look</button>
+  <button id="btnBreath">Breath</button>
+  <button id="btnMotion">Motion</button>
+  <button id="btnMotionLoop" class="on">Loop</button>
+  <button id="btnReset">Reset</button>
+</div>
+
+<script>
+var statusEl = document.getElementById('status');
+window.onerror = function(msg) {
+  statusEl.innerHTML = '<div>Script Error</div><div style="font-size:12px;margin-top:8px">' + msg + '</div>';
+  statusEl.className = 'error';
+};
+window.addEventListener('unhandledrejection', function(e) {
+  statusEl.innerHTML = '<div>Promise Error</div><div style="font-size:12px;margin-top:8px">' + (e.reason?.message || e.reason) + '</div>';
+  statusEl.className = 'error';
+});
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+    "@pixiv/three-vrm-animation": "https://cdn.jsdelivr.net/npm/@pixiv/three-vrm-animation@3.3.4/lib/three-vrm-animation.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin, VRMUtils } from 'https://cdn.jsdelivr.net/npm/@pixiv/three-vrm@2.1.3/lib/three-vrm.module.min.js';
+
+const statusEl = document.getElementById('status');
+const infoEl = document.getElementById('info');
+const moodEl = document.getElementById('mood');
+const params = new URLSearchParams(location.search);
+const modelPath = params.get('model');
+if (!modelPath) { statusEl.innerHTML = '<div>Missing ?model= parameter</div>'; statusEl.className = 'error'; throw new Error('no model'); }
+const base = params.get('base') || 'https://vrm.local/';
+const vrmUrl = base + modelPath.split('/').map(s => encodeURIComponent(s)).join('/');
+const motionPath = params.get('motion');
+statusEl.innerHTML = '<div class="spinner"></div><div>Loading...</div>';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#1a1a2e');
+const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 50);
+camera.position.set(0, 1.35, 2.8);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.0, 0);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 0.6; controls.maxDistance = 6;
+controls.maxPolarAngle = Math.PI * 0.7;
+controls.update();
+
+scene.add(new THREE.AmbientLight('#ffffff', 1.2));
+const l1 = new THREE.DirectionalLight('#ffffff', 2.0); l1.position.set(1, 2, 2); scene.add(l1);
+const l2 = new THREE.DirectionalLight('#ccccff', 0.8); l2.position.set(-1, 0.5, -1); scene.add(l2);
+const grid = new THREE.GridHelper(3, 20, '#333355', '#222244'); grid.position.y = -0.5; scene.add(grid);
+
+// ---- State ----
+let vrm = null, mixer = null, motionMixer = null, motionAction = null;
+let autoIdleBone = true, autoBlink = true, autoMood = true, autoLook = true, autoBreath = false;
+let motionPlaying = false, motionLoop = true;
+let idleTime = 0, moodTime = 0, lookTime = 0, breathTime = 0;
+let blinkTimer = null;
+let currentMood = 'neutral';
+const MOODS = ['neutral', 'happy', 'angry', 'sad', 'relaxed'];
+
+// ---- UI ----
+['btnIdle','btnBlink','btnMood','btnLook','btnBreath'].forEach(id => {
+  document.getElementById(id).addEventListener('click', function() {
+    const key = id.replace('btn','').toLowerCase();
+    const map = {idle:'autoIdleBone', blink:'autoBlink', mood:'autoMood', look:'autoLook', breath:'autoBreath'};
+    window[map[key]] = !window[map[key]];
+    this.classList.toggle('on', window[map[key]]);
+    if (key === 'blink' && !autoBlink && blinkTimer) clearTimeout(blinkTimer);
+    if (key === 'mood' && !autoMood) { setExpr('neutral', 1); setExpr(currentMood, 0); currentMood = 'neutral'; moodEl.style.opacity = '0'; }
+    if (key === 'breath' && !autoBreath) breathTime = 0;
+  });
+});
+document.getElementById('btnReset').addEventListener('click', () => {
+  camera.position.set(0, 1.35, 2.8);
+  controls.target.set(0, 1.0, 0);
+  controls.update();
+});
+document.getElementById('btnMotion').addEventListener('click', function() {
+  if (!motionAction) return;
+  motionPlaying = !motionPlaying;
+  this.classList.toggle('on', motionPlaying);
+  if (motionPlaying) {
+    motionAction.paused = false;
+    motionAction.play();
+  } else {
+    motionAction.paused = true;
+  }
+});
+document.getElementById('btnMotionLoop').addEventListener('click', function() {
+  if (!motionAction) return;
+  motionLoop = !motionLoop;
+  this.classList.toggle('on', motionLoop);
+  motionAction.loop = motionLoop ? THREE.LoopRepeat : THREE.LoopOnce;
+  if (!motionLoop) motionAction.clampWhenFinished = true;
+});
+
+// ---- Helpers ----
+const exprMgr = () => vrm && (vrm.expressionManager || vrm.blendShapeProxy);
+function setExpr(name, val) {
+  if (!vrm) return;
+  const e = exprMgr();
+  if (!e) return;
+  try {
+    if (typeof e.setExpressionValue === 'function') e.setExpressionValue(name, val);
+    else if (typeof e.setValue === 'function') e.setValue(name, val);
+  } catch(_) {}
+}
+
+function scheduleBlink() {
+  if (!autoBlink || !vrm) return;
+  blinkTimer = setTimeout(() => {
+    const t0 = performance.now();
+    function step() {
+      const e = performance.now() - t0;
+      let v = e < 50 ? e/50 : e < 100 ? 1 : e < 150 ? 1-(e-100)/50 : 0;
+      setExpr('blink', v);
+      if (e < 150) requestAnimationFrame(step);
+      else { setExpr('blink', 0); scheduleBlink(); }
+    }
+    step();
+  }, 2000 + Math.random() * 5000);
+}
+
+// ---- Bone lookup (supports three-vrm v2 internal structure) ----
+function getBone(boneName) {
+  if (!vrm || !vrm.humanoid) return null;
+  const hum = vrm.humanoid;
+  try {
+    if (typeof hum.getNormalizedBoneNode === 'function') {
+      const node = hum.getNormalizedBoneNode(boneName);
+      if (node) return node;
+    }
+  } catch(_) {}
+  try {
+    const hb = (hum._normalizedHumanBones || {}).humanBones;
+    if (hb && hb[boneName]) return hb[boneName];
+  } catch(_) {}
+  try {
+    const hb = (hum._rawHumanBones || {}).humanBones;
+    if (hb && hb[boneName]) return hb[boneName];
+  } catch(_) {}
+  return null;
+}
+
+// ---- Generic bone idle animation ----
+function applyBoneIdle(t) {
+  const hips = getBone('hips');
+  if (hips) {
+    hips.rotation.z = 0.015 * Math.sin(t * 0.7);
+    hips.rotation.x = 0.01 * Math.sin(t * 1.1 + 1);
+    hips.rotation.y = 0.02 * Math.sin(t * 0.5 + 2);
+  }
+  const spine = getBone('spine');
+  if (spine) {
+    spine.rotation.z = 0.012 * Math.sin(t * 0.7 + Math.PI);
+    spine.rotation.x = 0.008 * Math.sin(t * 1.3 + 2);
+  }
+  const chest = getBone('chest');
+  if (chest) {
+    chest.rotation.x = 0.01 * Math.sin(t * 1.4 + 1);
+  }
+  const head = getBone('head');
+  if (head) {
+    head.rotation.x = 0.025 * Math.sin(t * 0.6 + 1.5);
+    head.rotation.y = 0.035 * Math.sin(t * 0.4 + 3);
+    head.rotation.z = 0.02 * Math.sin(t * 0.55);
+  }
+  const lUpperArm = getBone('leftUpperArm');
+  if (lUpperArm) { lUpperArm.rotation.z = 0.025 * Math.sin(t * 0.5); }
+  const rUpperArm = getBone('rightUpperArm');
+  if (rUpperArm) { rUpperArm.rotation.z = 0.025 * Math.sin(t * 0.5 + Math.PI); }
+  const lLowerArm = getBone('leftLowerArm');
+  if (lLowerArm) { lLowerArm.rotation.z = 0.015 * Math.sin(t * 0.5 + 0.3); }
+  const rLowerArm = getBone('rightLowerArm');
+  if (rLowerArm) { rLowerArm.rotation.z = 0.015 * Math.sin(t * 0.5 + Math.PI + 0.3); }
+  const lHand = getBone('leftHand');
+  if (lHand) { lHand.rotation.x = 0.02 * Math.sin(t * 0.8 + 1); lHand.rotation.z = 0.015 * Math.sin(t * 0.6 + 2); }
+  const rHand = getBone('rightHand');
+  if (rHand) { rHand.rotation.x = 0.02 * Math.sin(t * 0.8 + 1 + Math.PI); rHand.rotation.z = 0.015 * Math.sin(t * 0.6 + 2 + Math.PI); }
+  const fingerBones = ['leftThumbProximal','leftIndexProximal','leftMiddleProximal','leftRingProximal','leftLittleProximal',
+                       'rightThumbProximal','rightIndexProximal','rightMiddleProximal','rightRingProximal','rightLittleProximal'];
+  fingerBones.forEach((name, i) => {
+    const b = getBone(name);
+    if (b) b.rotation.x = 0.03 * Math.sin(t * 0.45 + i * 0.7);
+  });
+  const lEye = getBone('leftEye');
+  if (lEye) { lEye.rotation.y = 0.02 * Math.sin(t * 1.2); lEye.rotation.x = 0.015 * Math.sin(t * 0.9 + 1); }
+  const rEye = getBone('rightEye');
+  if (rEye) { rEye.rotation.y = 0.02 * Math.sin(t * 1.2); rEye.rotation.x = 0.015 * Math.sin(t * 0.9 + 1); }
+  const jaw = getBone('jaw');
+  if (jaw) { jaw.rotation.x = 0.005 * Math.sin(t * 2.0 + 3); }
+}
+
+// ---- Load VRM ----
+const loader = new GLTFLoader();
+loader.register((parser) => new VRMLoaderPlugin(parser));
+
+function esc(s) { return String(s||'').replace(/</g,'&lt;'); }
+
+try {
+  const gltf = await loader.loadAsync(vrmUrl);
+  vrm = gltf.userData.vrm;
+  if (!vrm) { statusEl.innerHTML = '<div>No VRM extension</div>'; statusEl.className = 'error'; throw new Error('no vrm'); }
+
+  VRMUtils.rotateVRM0(vrm);
+  scene.add(vrm.scene);
+
+  // ---- Dump info ----
+  const meta = vrm.meta || {};
+  const sb = vrm.springBoneManager;
+  let sbDebug = '';
+  if (sb) {
+    for (let k of Object.keys(sb)) {
+      const v = sb[k];
+      if (Array.isArray(v)) sbDebug += k + '=' + v.length + ' ';
+      else if (v instanceof Map) sbDebug += k + '=Map(' + v.size + ') ';
+      else sbDebug += k + '=' + typeof v + ' ';
+    }
+  }
+  let boneNames = [];
+  let boneDebug = '';
+  if (vrm.humanoid) {
+    const hum = vrm.humanoid;
+    const n = hum._normalizedHumanBones;
+    if (n && n.humanBones) {
+      const hb = n.humanBones;
+      const keys = Object.keys(hb);
+      boneDebug += '_normalizedHumanBones.humanBones={' + keys.slice(0,10).join(',') + '...}(n=' + keys.length + ') ';
+      boneNames = keys;
+    }
+    const r = hum._rawHumanBones;
+    if (r && r.humanBones && boneNames.length === 0) {
+      const hb = r.humanBones;
+      const keys = Object.keys(hb);
+      boneDebug += '_rawHumanBones.humanBones={' + keys.slice(0,10).join(',') + '...}(n=' + keys.length + ') ';
+      boneNames = keys;
+    }
+    if (boneNames.length === 0 && typeof hum.getNormalizedBoneNode === 'function') {
+      const stdBones = ['hips','spine','chest','upperChest','neck','head',
+        'leftUpperArm','leftLowerArm','leftHand',
+        'rightUpperArm','rightLowerArm','rightHand',
+        'leftUpperLeg','leftLowerLeg','leftFoot',
+        'rightUpperLeg','rightLowerLeg','rightFoot'];
+      for (let b of stdBones) {
+        try { if (hum.getNormalizedBoneNode(b)) boneNames.push(b); } catch(_) {}
+      }
+    }
+  }
+  const exprNames = [];
+  const e = exprMgr();
+  if (e && e._expressionMap) {
+    for (let k of Object.keys(e._expressionMap)) exprNames.push(k);
+  }
+
+  let lines = [];
+  lines.push('Model: ' + esc(meta.title || meta.name || 'N/A'));
+  lines.push('Author: ' + esc(meta.author || 'N/A'));
+  lines.push('Humanoid bones: ' + (boneNames.length > 0 ? boneNames.join(', ') : 'none detected'));
+  lines.push('BoneDebug: ' + boneDebug);
+  lines.push('Expressions: ' + exprNames.join(', '));
+  lines.push('SpringBones: ' + sbDebug);
+  lines.push('AnimClips: ' + (gltf.animations?.length || 0));
+  infoEl.innerHTML = lines.join('<br>');
+  console.log('=== VRM Model Info ===');
+  lines.forEach(l => console.log(l.replace(/<[^>]*>/g, '')));
+
+  if (gltf.animations && gltf.animations.length > 0) {
+    mixer = new THREE.AnimationMixer(vrm.scene);
+    gltf.animations.forEach(c => { const a = mixer.clipAction(c); a.play(); });
+  }
+
+  statusEl.style.opacity = '0';
+  setTimeout(() => statusEl.remove(), 600);
+  scheduleBlink();
+
+  // ---- Load VRMA Motion ----
+  if (motionPath) {
+    try {
+      const { VRMAnimationLoaderPlugin, createVRMAnimationClip } = await import(
+        '@pixiv/three-vrm-animation'
+      );
+      const motionUrl = base + motionPath.split('/').map(s => encodeURIComponent(s)).join('/');
+      const motionLoader = new GLTFLoader();
+      motionLoader.register((parser) => new VRMAnimationLoaderPlugin(parser));
+      const motionGltf = await motionLoader.loadAsync(motionUrl);
+      const vrmAnimations = motionGltf.userData.vrmAnimations;
+      if (vrmAnimations && vrmAnimations.length > 0) {
+        const clip = createVRMAnimationClip(vrmAnimations[0], vrm);
+        motionMixer = new THREE.AnimationMixer(vrm.scene);
+        motionAction = motionMixer.clipAction(clip);
+        motionAction.loop = THREE.LoopRepeat;
+        motionAction.clampWhenFinished = false;
+        motionAction.play();
+        motionPlaying = true;
+        document.getElementById('btnMotion').classList.add('on');
+        lines.push('Motion: loaded (' + clip.duration.toFixed(1) + 's)');
+        infoEl.innerHTML = lines.join('<br>');
+        console.log('VRMA motion loaded, duration:', clip.duration);
+      } else {
+        console.warn('No vrmAnimations found in VRMA file');
+        lines.push('Motion: no animations found');
+        infoEl.innerHTML = lines.join('<br>');
+      }
+    } catch (motionErr) {
+      console.error('Failed to load VRMA motion:', motionErr);
+      lines.push('Motion: load error - ' + esc(motionErr.message));
+      infoEl.innerHTML = lines.join('<br>');
+    }
+  }
+
+  // ---- Animation loop ----
+  const clock = new THREE.Clock();
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.1);
+    controls.update();
+
+    if (vrm) {
+      vrm.update(dt);
+      if (motionMixer) motionMixer.update(dt);
+      if (mixer) mixer.update(dt);
+    }
+
+    // Bone-based idle — pause when motion is playing
+    if (autoIdleBone && !motionPlaying) {
+      idleTime += dt;
+      applyBoneIdle(idleTime);
+    }
+
+    // Bone-based breathing
+    if (autoBreath) {
+      breathTime += dt;
+      const chest = getBone('chest') || getBone('upperChest') || getBone('spine');
+      if (chest) {
+        chest.scale.y = 1 + 0.008 * Math.sin(breathTime * 1.5);
+        chest.scale.x = 1 + 0.004 * Math.sin(breathTime * 1.5);
+      }
+    }
+
+    // Auto mood cycling
+    if (autoMood) {
+      moodTime += dt;
+      const idx = Math.floor(moodTime / 5) % MOODS.length;
+      const newMood = MOODS[idx];
+      if (newMood !== currentMood) {
+        setExpr(currentMood, 0);
+        currentMood = newMood;
+        setExpr(currentMood, 0.8);
+        moodEl.textContent = currentMood;
+        moodEl.style.opacity = '1';
+        setTimeout(() => { if (autoMood) moodEl.style.opacity = '0'; }, 2000);
+      }
+    }
+
+    // Auto look around
+    if (autoLook) {
+      lookTime += dt;
+      const c = lookTime % 8;
+      setExpr('lookLeft',  c < 2 ? 0.4 : 0);
+      setExpr('lookRight', c >= 3 && c < 5 ? 0.4 : 0);
+      setExpr('lookUp',    c >= 6 && c < 6.5 ? 0.3 : 0);
+      setExpr('lookDown',  c >= 7 ? 0.3 : 0);
+    }
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+} catch (err) {
+  console.error(err);
+  statusEl.innerHTML = '<div>Failed</div><div style="font-size:12px;margin-top:8px">' + esc(err.message || String(err)) + '</div>';
+  statusEl.className = 'error';
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

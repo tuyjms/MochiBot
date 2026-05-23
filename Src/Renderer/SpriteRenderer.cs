@@ -221,25 +221,22 @@ namespace MochiBot.Src.Renderer
         {
             Image? rawFrame = null;
 
-            if (_isGif && _gifImage != null)
+            lock (_frameLock)
             {
-                _gifImage.SelectActiveFrame(new FrameDimension(_gifGuid), _currentFrameIndex);
-                rawFrame = new Bitmap(_gifImage);
-            }
-            else if (_spriteLoader != null)
-            {
-                rawFrame = _spriteLoader.GetFrame(_currentFrameIndex);
-            }
-
-            if (rawFrame != null)
-            {
-                // 直接使用原始帧，保留 PNG 透明通道
-                _currentFrame?.Dispose();
-                _currentFrame = rawFrame;
-
-                // 同步生成 PNG 字节缓存（加锁保护）
-                lock (_frameLock)
+                if (_isGif && _gifImage != null)
                 {
+                    _gifImage.SelectActiveFrame(new FrameDimension(_gifGuid), _currentFrameIndex);
+                    rawFrame = new Bitmap(_gifImage);
+                }
+                else if (_spriteLoader != null)
+                {
+                    rawFrame = _spriteLoader.GetFrame(_currentFrameIndex);
+                }
+
+                if (rawFrame != null)
+                {
+                    _currentFrame?.Dispose();
+                    _currentFrame = rawFrame;
                     _currentFrameBytes = EncodeToPngBytes(rawFrame);
                 }
             }
