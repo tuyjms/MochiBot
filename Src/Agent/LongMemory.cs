@@ -11,6 +11,9 @@ namespace MochiBot.Src.Agent
     /// </summary>
     public class LongMemory : ILongMemory
     {
+        private const string DefaultKeyword = "general";
+        private const string DefaultEventKeyword = "event";
+
         private readonly LongMemoryRepository _repository;
         private readonly IConfigReader _configReader;
         private readonly LlmClient _llmClient;
@@ -159,9 +162,9 @@ namespace MochiBot.Src.Agent
                 // 没有 LlmClient 时简单提取前几个词
                 var words = text.Split(new[] { ' ', '，', '。', '！', '？', '\n' }, StringSplitOptions.RemoveEmptyEntries);
                 return (
-                    words.Length > 0 ? words[0] : "general",
-                    words.Length > 1 ? words[1] : "general",
-                    words.Length > 2 ? words[2] : "general"
+                    words.Length > 0 ? words[0] : DefaultKeyword,
+                    words.Length > 1 ? words[1] : DefaultKeyword,
+                    words.Length > 2 ? words[2] : DefaultKeyword
                 );
             }
 
@@ -172,14 +175,14 @@ namespace MochiBot.Src.Agent
 
                 var parts = response.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 return (
-                    parts.Length > 0 ? parts[0] : "general",
-                    parts.Length > 1 ? parts[1] : "general",
-                    parts.Length > 2 ? parts[2] : "general"
+                    parts.Length > 0 ? parts[0] : DefaultKeyword,
+                    parts.Length > 1 ? parts[1] : DefaultKeyword,
+                    parts.Length > 2 ? parts[2] : DefaultKeyword
                 );
             }
             catch
             {
-                return ("general", "general", "general");
+                return (DefaultKeyword, DefaultKeyword, DefaultKeyword);
             }
         }
 
@@ -219,9 +222,9 @@ namespace MochiBot.Src.Agent
                 var entry = new LongMemoryEntry
                 {
                     Id = $"mem_{DateTime.Now:yyyyMMddHHmmss}_{Guid.NewGuid():N}",
-                    Keyword1 = keywords.Length > 0 ? keywords[0] : "event",
-                    Keyword2 = keywords.Length > 1 ? keywords[1] : "event",
-                    Keyword3 = keywords.Length > 2 ? keywords[2] : "event",
+                    Keyword1 = keywords.Length > 0 ? keywords[0] : DefaultEventKeyword,
+                    Keyword2 = keywords.Length > 1 ? keywords[1] : DefaultEventKeyword,
+                    Keyword3 = keywords.Length > 2 ? keywords[2] : DefaultEventKeyword,
                     Description = description,
                     EventTimestamp = DateTime.Now,
                     Importance = 10,

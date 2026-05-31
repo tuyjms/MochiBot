@@ -5,6 +5,8 @@ using MochiBot.Src.Core.Database;
 using MochiBot.Src.Core.Events;
 using MochiBot.Src.EventModels;
 using MochiBot.Src.Services;
+using static MochiBot.Src.Core.Constants;
+using static MochiBot.Src.EventModels.MoodEventTypes;
 using LlmClient = MochiBot.Src.Services.LlmClient;
 using OpenAiChatMessage = OpenAI.Chat.ChatMessage;
 using OpenAiSystemChatMessage = OpenAI.Chat.SystemChatMessage;
@@ -45,6 +47,18 @@ namespace MochiBot.Src.Agent
         private string _lastJsonError = string.Empty;
         private string _functionProviderName = string.Empty;
         private string _functionModelName = string.Empty;
+
+        // 自动事件 LLM 提示词（BuildAutoEventPrompt 使用）
+        private const string MurmurPrompt = "你现在想对用户说一句碎碎念/撒娇的话，表达你的思念或关心。";
+        private const string EyeRestPrompt = "用户已经盯着屏幕很久了，提醒他休息一下眼睛。";
+        private const string LateNightPrompt = "已经很晚了，关心用户为什么还没睡，温柔地催他睡觉。";
+        private const string DefaultEventFallback = "请根据事件生成合适的回复。";
+
+        // 短期记忆中的系统消息标签
+        private const string TagMidTermMemory = "[中期记忆]";
+        private const string TagToolExecution = "[工具执行]";
+        private const string TagPluginExecution = "[插件执行]";
+        private const string TagMcpExecution = "[MCP执行]";
 
         // 对话模式 System Prompt 模板（固定模板，人格提示词动态注入）
         private const string SystemPromptTemplate = @"
@@ -105,7 +119,7 @@ namespace MochiBot.Src.Agent
             _actionExecutor = new ActionExecutor(
                 _toolService,
                 mood => ChangeMoodByEvent(mood.ToString()),
-                (desc, param) => _shortTermMemory.AddMessage("system", $"[中期记忆] {desc}"),
+                (desc, param) => _shortTermMemory.AddMessage(ChatRoles.System, $"{TagMidTermMemory} {desc}"),
                 anim =>
                 {
                     _lastEvent = $"animation:{anim}";
@@ -116,7 +130,7 @@ namespace MochiBot.Src.Agent
                         Info = JsonSerializer.Serialize(new
                         {
                             animation = anim,
-                            source = "tool"
+                            source = EventSources.Tool
                         })
                     });
                 });
@@ -148,10 +162,10 @@ namespace MochiBot.Src.Agent
                     if (doc.RootElement.TryGetProperty("type", out var typeProp))
                     {
                         var uiType = typeProp.GetString();
-                        if (uiType == "pet")
+                        if (uiType == UiInteractionTypes.Pet)
                         {
-                            _lastEvent = "Pet";
-                            ChangeMoodByEvent("Pet");
+                            _lastEvent = Pet;
+                            ChangeMoodByEvent(Pet);
                         }
                     }
                 }
@@ -197,7 +211,7 @@ namespace MochiBot.Src.Agent
                     _actionExecutor = new ActionExecutor(
                         _toolService,
                         mood => ChangeMoodByEvent(mood.ToString()),
-                        (desc, param) => _shortTermMemory.AddMessage("system", $"[中期记忆] {desc}"),
+                        (desc, param) => _shortTermMemory.AddMessage(ChatRoles.System, $"{TagMidTermMemory} {desc}"),
                         anim =>
                         {
                             _lastEvent = $"animation:{anim}";
@@ -205,7 +219,7 @@ namespace MochiBot.Src.Agent
                             {
                                 Category = EventCategory.MoodChange,
                                 Trigger = EventTrigger.Tool,
-                                Info = JsonSerializer.Serialize(new { animation = anim, source = "tool" })
+                                Info = JsonSerializer.Serialize(new { animation = anim, source = EventSources.Tool })
                             });
                         });
 
@@ -295,13 +309,13 @@ namespace MochiBot.Src.Agent
         {
             var newMood = eventType switch
             {
-                "LateNight" or "Sleepy" => AgentMood.Sleepy,
-                "LongWork" => AgentMood.Neutral,
-                "Idle" => AgentMood.Sad,
-                "Active" => AgentMood.Neutral,
-                "Pet" => AgentMood.Touched,
-                "Compliment" => AgentMood.Happy,
-                "Angry" => AgentMood.Angry,
+                LateNight or Sleepy => AgentMood.Sleepy,
+                LongWork => AgentMood.Neutral,
+                Idle => AgentMood.Sad,
+                Active => AgentMood.Neutral,
+                Pet => AgentMood.Touched,
+                Compliment => AgentMood.Happy,
+                Angry => AgentMood.Angry,
                 _ => _currentMood
             };
 
@@ -385,7 +399,7 @@ namespace MochiBot.Src.Agent
                     return false;
 
                 var type = typeProp.GetString();
-                if (type != "murmur")
+                if (type != BuiltinTasks.Murmur)
                     return false;
 
                 // 从 parameters 中读取权重
@@ -404,26 +418,26 @@ namespace MochiBot.Src.Agent
                 }
 
                 // 使用内置碎碎念文本（通过 ToolService 统一工具接口）
-                var result = _toolService.ExecuteToolAsync("murmur", "{}").GetAwaiter().GetResult();
+                var result = _toolService.ExecuteToolAsync(Tools.Murmur, "{}").GetAwaiter().GetResult();
                 if (result.Success)
                 {
                     using var resultDoc = JsonDocument.Parse(result.Data);
-                    var text = resultDoc.RootElement.TryGetProperty("murmur", out var murmurProp)
+                    var text = resultDoc.RootElement.TryGetProperty(Tools.Murmur, out var murmurProp)
                         ? murmurProp.GetString() ?? ""
                         : "";
 
                     if (!string.IsNullOrEmpty(text))
                     {
-                        _shortTermMemory.AddMessage("assistant", text);
+                        _shortTermMemory.AddMessage(ChatRoles.Assistant, text);
                         _eventDispatcher.Publish(new EventData
                         {
                             Category = EventCategory.ToolResult,
                             Trigger = EventTrigger.System,
                             Info = JsonSerializer.Serialize(new
                             {
-                                type = "reply",
+                                type = Tools.Reply,
                                 content = text,
-                                source = "murmur"
+                                source = Tools.Murmur
                             })
                         });
                     }
@@ -451,7 +465,7 @@ namespace MochiBot.Src.Agent
             }
 
             // 1. 记录用户消息到短期记忆
-            _shortTermMemory.AddMessage("user", userMessage);
+            _shortTermMemory.AddMessage(ChatRoles.User, userMessage);
 
             // 检查是否需要触发短期记忆总结
             if (_shortTermMemory.IsSummarizePending)
@@ -466,8 +480,8 @@ namespace MochiBot.Src.Agent
             // 3. 调用 LLM（对话模式）
             var messages = new List<ChatMessage>
             {
-                new() { Role = "system", Content = systemPrompt },
-                new() { Role = "user", Content = userContext }
+                new() { Role = ChatRoles.System, Content = systemPrompt },
+                new() { Role = ChatRoles.User, Content = userContext }
             };
 
             var response = await CallLlmChatAsync(messages);
@@ -487,7 +501,7 @@ namespace MochiBot.Src.Agent
             // 7. 如果有回复，记录到短期记忆并发布回复事件
             if (!string.IsNullOrEmpty(reply))
             {
-                _shortTermMemory.AddMessage("assistant", reply);
+                _shortTermMemory.AddMessage(ChatRoles.Assistant, reply);
 
                 // 发布回复事件，供 UI 订阅显示
                 _eventDispatcher.Publish(new EventData
@@ -496,7 +510,7 @@ namespace MochiBot.Src.Agent
                     Trigger = EventTrigger.Llm,
                     Info = JsonSerializer.Serialize(new
                     {
-                        type = "reply",
+                        type = Tools.Reply,
                         content = reply,
                         source = eventData.Category.ToString()
                     })
@@ -515,16 +529,16 @@ namespace MochiBot.Src.Agent
                     var type = typeProp.GetString();
                     return type switch
                     {
-                        "murmur" => "你现在想对用户说一句碎碎念/撒娇的话，表达你的思念或关心。",
-                        "eye_rest" => "用户已经盯着屏幕很久了，提醒他休息一下眼睛。",
-                        "late_night" => "已经很晚了，关心用户为什么还没睡，温柔地催他睡觉。",
+                        BuiltinTasks.Murmur => MurmurPrompt,
+                        BuiltinTasks.EyeRest => EyeRestPrompt,
+                        BuiltinTasks.LateNight => LateNightPrompt,
                         _ => $"事件类型：{type}。请根据这个事件生成合适的回复。"
                     };
                 }
             }
             catch { }
 
-            return "请根据事件生成合适的回复。";
+            return DefaultEventFallback;
         }
 
         // ========== 状态查询 ==========
@@ -547,13 +561,13 @@ namespace MochiBot.Src.Agent
         /// <summary>构建 System Prompt（人格提示词动态注入）</summary>
         private string BuildSystemPrompt()
         {
-            var name = _personality?.Name ?? "小琪";
+            var name = _personality?.Name ?? CharacterDefaults.DefaultName;
             var userName = _appSettings.UserName;
 
             // 人格描述：优先使用当前子人格的描述，否则使用人格根描述
             var personalityDesc = _currentSubPersonality?.Description
                 ?? _personality?.Description
-                ?? "温柔可爱，善解人意";
+                ?? CharacterDefaults.DefaultDescription;
 
             // 基础工具描述
             var baseTools = _toolService.GetToolDefinitions();
@@ -606,13 +620,13 @@ namespace MochiBot.Src.Agent
         private static (string provider, string model) ParseModelName(string modelFullName)
         {
             if (string.IsNullOrEmpty(modelFullName) || modelFullName == "default")
-                return ("LocalLMStudio", "default");
+                return (ProviderConfig.DefaultProviderName, "default");
 
             var parts = modelFullName.Split('/', 2);
             if (parts.Length == 2)
                 return (parts[0], parts[1]);
 
-            return ("LocalLMStudio", modelFullName);
+            return (ProviderConfig.DefaultProviderName, modelFullName);
         }
 
         /// <summary>获取对话模型名称（从主人格读取 ChatModels）</summary>
@@ -624,7 +638,7 @@ namespace MochiBot.Src.Agent
                 return ParseModelName(_personality.ChatModels[0]);
             }
 
-            return ("LocalLMStudio", "default");
+            return (ProviderConfig.DefaultProviderName, "default");
         }
 
         /// <summary>获取函数调用模型名称（从主人格读取 FunctionModels）</summary>
@@ -645,9 +659,9 @@ namespace MochiBot.Src.Agent
         {
             var openAiMessages = messages.Select(m => m.Role switch
             {
-                "system" => (OpenAiChatMessage)new OpenAiSystemChatMessage(m.Content),
-                "user" => new OpenAiUserChatMessage(m.Content),
-                "assistant" => new OpenAiAssistantChatMessage(m.Content),
+                ChatRoles.System => (OpenAiChatMessage)new OpenAiSystemChatMessage(m.Content),
+                ChatRoles.User => new OpenAiUserChatMessage(m.Content),
+                ChatRoles.Assistant => new OpenAiAssistantChatMessage(m.Content),
                 _ => new OpenAiUserChatMessage(m.Content)
             }).ToList();
 
@@ -690,17 +704,17 @@ namespace MochiBot.Src.Agent
             {
                 foreach (var action in actions)
                 {
-                    if (action.Type == "tool_call" && action.Name != "reply")
+                    if (action.Type == ActionTypes.ToolCall && action.Name != Tools.Reply)
                     {
-                        _shortTermMemory.AddMessage("system", $"[工具执行] {action.Name}");
+                        _shortTermMemory.AddMessage(ChatRoles.System, $"{TagToolExecution} {action.Name}");
                     }
-                    else if (action.Type == "plugin_call")
+                    else if (action.Type == ActionTypes.PluginCall)
                     {
-                        _shortTermMemory.AddMessage("system", $"[插件执行] {action.Name}");
+                        _shortTermMemory.AddMessage(ChatRoles.System, $"{TagPluginExecution} {action.Name}");
                     }
-                    else if (action.Type == "mcp_call")
+                    else if (action.Type == ActionTypes.McpCall)
                     {
-                        _shortTermMemory.AddMessage("system", $"[MCP执行] {action.ServerName}/{action.Name}");
+                        _shortTermMemory.AddMessage(ChatRoles.System, $"{TagMcpExecution} {action.ServerName}/{action.Name}");
                     }
                 }
             }
@@ -714,8 +728,8 @@ namespace MochiBot.Src.Agent
             var hour = DateTime.Now.Hour;
             if (hour >= 23 || hour < 6)
             {
-                _lastEvent = "LateNight";
-                ChangeMoodByEvent("LateNight");
+                _lastEvent = LateNight;
+                ChangeMoodByEvent(LateNight);
                 return;
             }
 
@@ -723,21 +737,21 @@ namespace MochiBot.Src.Agent
 
             if (msg.Contains("摸摸") || msg.Contains("摸头") || msg.Contains("拍头") || msg.Contains("抱抱"))
             {
-                _lastEvent = "Pet";
-                ChangeMoodByEvent("Pet");
+                _lastEvent = Pet;
+                ChangeMoodByEvent(Pet);
                 return;
             }
 
             if (msg.Contains("夸") || msg.Contains("好看") || msg.Contains("可爱") || msg.Contains("漂亮") ||
                 msg.Contains("喜欢你") || msg.Contains("真棒") || msg.Contains("厉害"))
             {
-                _lastEvent = "Compliment";
-                ChangeMoodByEvent("Compliment");
+                _lastEvent = Compliment;
+                ChangeMoodByEvent(Compliment);
                 return;
             }
 
-            _lastEvent = "Active";
-            ChangeMoodByEvent("Active");
+            _lastEvent = Active;
+            ChangeMoodByEvent(Active);
         }
     }
 

@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.IO;
 using MochiBot.Src.EventModels;
+using static MochiBot.Src.Core.Constants;
 
 namespace MochiBot.Src.Renderer
 {
@@ -13,11 +14,11 @@ namespace MochiBot.Src.Renderer
         // 心情工具名 → 对应情绪
         private static readonly Dictionary<string, AgentMood> ToolMoodMap = new(StringComparer.OrdinalIgnoreCase)
         {
-            { "cry",    AgentMood.Sad },
-            { "dance",  AgentMood.Happy },
-            { "yawn",   AgentMood.Sleepy },
-            { "blush",  AgentMood.Touched },
-            { "stomp",  AgentMood.Angry },
+            { Tools.Cry,    AgentMood.Sad },
+            { Tools.Dance,  AgentMood.Happy },
+            { Tools.Yawn,   AgentMood.Sleepy },
+            { Tools.Blush,  AgentMood.Touched },
+            { Tools.Stomp,  AgentMood.Angry },
         };
 
         // 情绪 → 该情绪下的所有动作目录名
@@ -242,7 +243,7 @@ namespace MochiBot.Src.Renderer
 
                     var config = new SpriteSheetConfig
                     {
-                        Type = "png",
+                        Type = SpriteTypes.Png,
                         File = Path.GetFileName(pngFile)
                     };
                     if (!renderer.LoadFromConfig(config, actionDir))

@@ -5,6 +5,15 @@
     /// </summary>
     public class ProviderConfig
     {
+        /// <summary>默认提供商名称（首次生成配置时使用）</summary>
+        public const string DefaultProviderName = "LocalLMStudio";
+
+        /// <summary>默认 API 密钥</summary>
+        public const string DefaultApiKey = "not-needed";
+
+        /// <summary>默认 API 基础地址</summary>
+        public const string DefaultBaseUrl = "http://localhost:1234/v1";
+
         /// <summary>API密钥</summary>
         public string ApiKey { get; set; } = string.Empty;
 

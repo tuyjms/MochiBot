@@ -1,12 +1,20 @@
-﻿namespace MochiBot.Src.Core.Config.Models
+﻿using static MochiBot.Src.Core.Constants;
+
+namespace MochiBot.Src.Core.Config.Models
 {
     /// <summary>
     /// 应用级配置
     /// </summary>
     public class AppSettings
     {
+        /// <summary>合法日志级别选项</summary>
+        public static readonly string[] ValidLogLevels = { "Debug", "Info", "Warn", "Error" };
+
+        /// <summary>MaxActionsPerResponse 的上限</summary>
+        public const int MaxActionsUpperBound = 20;
+
         /// <summary>用户名称（LLM 对用户的称呼）</summary>
-        public string UserName { get; set; } = "主人";
+        public string UserName { get; set; } = UserDefaults.DefaultUserName;
 
         /// <summary>当前激活的人格名称（对应 Resources/Personalities/ 下的 {名称}_person.json）</summary>
         public string ActivePersonality { get; set; } = "default";

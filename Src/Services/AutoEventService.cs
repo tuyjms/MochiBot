@@ -2,6 +2,7 @@
 using System.Timers;
 using MochiBot.Src.Core.Events;
 using MochiBot.Src.EventModels;
+using static MochiBot.Src.Core.Constants;
 using Timer = System.Timers.Timer;
 
 namespace MochiBot.Src.Services
@@ -217,7 +218,7 @@ namespace MochiBot.Src.Services
                 {
                     Category = EventCategory.SystemAuto,
                     Trigger = EventTrigger.System,
-                    Info = JsonSerializer.Serialize(new { type = "murmur", name = "碎碎念" })
+                    Info = JsonSerializer.Serialize(new { type = BuiltinTasks.Murmur, name = BuiltinTasks.NameMurmur })
                 });
             }
         }
@@ -237,7 +238,7 @@ namespace MochiBot.Src.Services
                 {
                     Category = EventCategory.SystemAuto,
                     Trigger = EventTrigger.System,
-                    Info = JsonSerializer.Serialize(new { type = "eye_rest", hours, name = "用眼提醒" })
+                    Info = JsonSerializer.Serialize(new { type = BuiltinTasks.EyeRest, hours, name = BuiltinTasks.NameEyeRest })
                 });
             }
         }
@@ -259,7 +260,7 @@ namespace MochiBot.Src.Services
                 {
                     Category = EventCategory.SystemAuto,
                     Trigger = EventTrigger.System,
-                    Info = JsonSerializer.Serialize(new { type = "late_night", name = "深夜关怀" })
+                    Info = JsonSerializer.Serialize(new { type = BuiltinTasks.LateNight, name = BuiltinTasks.NameLateNight })
                 });
             }
         }

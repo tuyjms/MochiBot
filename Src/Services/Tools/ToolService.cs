@@ -2,6 +2,7 @@
 using MochiBot.Src.Core.Config;
 using MochiBot.Src.Services;
 using MochiBot.Src.EventModels;
+using static MochiBot.Src.Core.Constants;
 
 namespace MochiBot.Src.Services.Tool
 {
@@ -11,6 +12,8 @@ namespace MochiBot.Src.Services.Tool
     /// </summary>
     public class ToolService : IToolService, IDisposable
     {
+        private const string DefaultMurmurText = "那个…你在忙吗？我、我只是想你了…";
+
         private readonly IDllModLoader _modLoader;
         private readonly IConfigReader _configReader;
         private readonly Random _random = new();
@@ -20,31 +23,31 @@ namespace MochiBot.Src.Services.Tool
         {
             [AgentMood.Sad] = new ToolDefinition
             {
-                Name = "cry",
+                Name = Tools.Cry,
                 Description = "播放哭泣动画，表达委屈难过的情绪（当前心情委屈时可用）",
                 InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
             },
             [AgentMood.Happy] = new ToolDefinition
             {
-                Name = "dance",
+                Name = Tools.Dance,
                 Description = "播放跳舞动画，表达开心愉悦的情绪（当前心情开心时可用）",
                 InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
             },
             [AgentMood.Sleepy] = new ToolDefinition
             {
-                Name = "yawn",
+                Name = Tools.Yawn,
                 Description = "播放打哈欠动画，表达困倦想睡的情绪（当前心情困倦时可用）",
                 InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
             },
             [AgentMood.Touched] = new ToolDefinition
             {
-                Name = "blush",
+                Name = Tools.Blush,
                 Description = "播放脸红动画，表达害羞感动的情绪（当前心情感动时可用）",
                 InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
             },
             [AgentMood.Angry] = new ToolDefinition
             {
-                Name = "stomp",
+                Name = Tools.Stomp,
                 Description = "播放跺脚动画，表达生气不满的情绪（当前心情生气时可用）",
                 InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } }
             }
@@ -61,18 +64,18 @@ namespace MochiBot.Src.Services.Tool
         {
             var tools = new List<ToolDefinition>
             {
-                new() { Name = "timer", Description = "启动一个倒计时，倒计时结束后会提醒用户", 
-                        InputSchema = new Dictionary<string, object> { 
+                new() { Name = Tools.Timer, Description = "启动一个倒计时，倒计时结束后会提醒用户",
+                        InputSchema = new Dictionary<string, object> {
                             { "type", "object" },
-                            { "properties", new Dictionary<string, object> { 
+                            { "properties", new Dictionary<string, object> {
                             { "seconds", new Dictionary<string, object> {
-                            { "type", "integer" }, 
-                            { "description", "倒计时秒数" }, 
+                            { "type", "integer" },
+                            { "description", "倒计时秒数" },
                             { "minimum", 10 }, { "maximum", 3600 } } } } },
                             { "required", new[] { "seconds" } } } },
-                new() { Name = "list_plugins", Description = "列出所有已加载的DLLMOD插件和MCP服务器工具及其描述", 
+                new() { Name = Tools.ListPlugins, Description = "列出所有已加载的DLLMOD插件和MCP服务器工具及其描述",
                 InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object>() }, { "required", Array.Empty<string>() } } },
-                new() { Name = "reply", Description = "回复用户说的话。如果不调用此工具，则表示不回复（保持沉默）。调用此工具时，reply_text 参数为你要说的话",
+                new() { Name = Tools.Reply, Description = "回复用户说的话。如果不调用此工具，则表示不回复（保持沉默）。调用此工具时，reply_text 参数为你要说的话",
                 InputSchema = new Dictionary<string, object> { { "type", "object" }, { "properties", new Dictionary<string, object> { { "reply_text", new Dictionary<string, object> { { "type", "string" }, { "description", "你要对用户说的话" } } } } }, { "required", new[] { "reply_text" } } } }
             };
 
@@ -176,9 +179,9 @@ actions 数组中每个元素的 type 可以是：
         {
             return toolName switch
             {
-                "timer" => await ExecuteTimerAsync(parameters),
-                "murmur" => await ExecuteMurmurAsync(),
-                "list_plugins" => await ExecuteListPluginsAsync(),
+                Tools.Timer => await ExecuteTimerAsync(parameters),
+                Tools.Murmur => await ExecuteMurmurAsync(),
+                Tools.ListPlugins => await ExecuteListPluginsAsync(),
                 _ => null
             };
         }
@@ -188,11 +191,11 @@ actions 数组中每个元素的 type 可以是：
         {
             return toolName switch
             {
-                "cry" => new ToolResult { Success = true, Data = "{\"animation\":\"cry\"}" },
-                "dance" => new ToolResult { Success = true, Data = "{\"animation\":\"dance\"}" },
-                "yawn" => new ToolResult { Success = true, Data = "{\"animation\":\"yawn\"}" },
-                "blush" => new ToolResult { Success = true, Data = "{\"animation\":\"blush\"}" },
-                "stomp" => new ToolResult { Success = true, Data = "{\"animation\":\"stomp\"}" },
+                Tools.Cry => new ToolResult { Success = true, Data = "{\"animation\":\"cry\"}" },
+                Tools.Dance => new ToolResult { Success = true, Data = "{\"animation\":\"dance\"}" },
+                Tools.Yawn => new ToolResult { Success = true, Data = "{\"animation\":\"yawn\"}" },
+                Tools.Blush => new ToolResult { Success = true, Data = "{\"animation\":\"blush\"}" },
+                Tools.Stomp => new ToolResult { Success = true, Data = "{\"animation\":\"stomp\"}" },
                 _ => null
             };
         }
@@ -240,7 +243,7 @@ actions 数组中每个元素的 type 可以是：
             var texts = settings.MurmurTexts;
             if (texts == null || texts.Count == 0)
             {
-                texts = new List<string> { "那个…你在忙吗？我、我只是想你了…" };
+                texts = new List<string> { DefaultMurmurText };
             }
             var text = texts[_random.Next(texts.Count)];
             return Task.FromResult(new ToolResult { Success = true, Data = JsonSerializer.Serialize(new { murmur = text }) });

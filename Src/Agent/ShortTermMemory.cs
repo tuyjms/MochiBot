@@ -1,6 +1,7 @@
 using MochiBot.Src.Core.Config;
 using MochiBot.Src.EventModels;
 using MochiBot.Src.Services;
+using static MochiBot.Src.Core.Constants;
 
 namespace MochiBot.Src.Agent
 {
@@ -195,7 +196,7 @@ namespace MochiBot.Src.Agent
             Clear();
             _contextSummary = summary;
             _summarizePending = false;
-            AddMessage("system", summary);
+            AddMessage(ChatRoles.System, summary);
             foreach (var msg in reservedMessages)
             {
                 AddMessage(msg.Role, msg.Content);

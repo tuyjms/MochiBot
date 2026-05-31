@@ -75,6 +75,7 @@ Desktop.ini
 appsettings.Development.json
 appsettings.User.json
 appsettings.json
+SystemAnimatorOnline/
 
 # 人格配置文件（用户自定义）
 Resources/Personalities/*_person.json

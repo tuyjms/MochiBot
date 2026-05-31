@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.Drawing;
 using System.Text.Json;
+using static MochiBot.Src.Core.Constants;
 
 namespace MochiBot.Src.Renderer
 {
@@ -9,7 +10,7 @@ namespace MochiBot.Src.Renderer
     /// </summary>
     public class SpriteSheetConfig
     {
-        public string Type { get; set; } = "sprite";   // sprite / gif / png
+        public string Type { get; set; } = SpriteTypes.Sprite;   // sprite / gif / png
         public string File { get; set; } = "";
         public int FrameWidth { get; set; }
         public int FrameHeight { get; set; }

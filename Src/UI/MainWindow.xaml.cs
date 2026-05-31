@@ -9,6 +9,7 @@ using MochiBot.Src.Core.Events;
 using MochiBot.Src.EventModels;
 using MochiBot.Src.Renderer;
 using MochiBot.Src.Services;
+using static MochiBot.Src.Core.Constants;
 using EventTrigger = MochiBot.Src.EventModels.EventTrigger;
 
 namespace MochiBot.Src.UI
@@ -96,8 +97,8 @@ namespace MochiBot.Src.UI
 
             // 从配置读取角色名称更新气泡头像
             var personality = _configReader.GetActivePersonality();
-            var characterName = personality?.Name ?? "小琪";
-            bubbleAvatarText.Text = characterName.Length > 0 ? characterName[..1] : "琪";
+            var characterName = personality?.Name ?? CharacterDefaults.DefaultName;
+            bubbleAvatarText.Text = characterName.Length > 0 ? characterName[..1] : CharacterDefaults.DefaultAvatarText;
         }
 
         /// <summary>

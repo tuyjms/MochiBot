@@ -78,7 +78,18 @@ namespace MochiBot.Src.EventModels
     }
 
     /// <summary>
-    /// 系统自动事件类型，只需在事件信息中说明就行
-    /// UI交互事件类型也是只需在事件信息说明
+    /// 情绪事件类型常量
+    /// 用于 ChangeMoodByEvent 和 DetectAndTriggerMoodEvent 的事件类型字符串
     /// </summary>
+    public static class MoodEventTypes
+    {
+        public const string LateNight = "LateNight";
+        public const string Sleepy = "Sleepy";
+        public const string LongWork = "LongWork";
+        public const string Idle = "Idle";
+        public const string Active = "Active";
+        public const string Pet = "Pet";
+        public const string Compliment = "Compliment";
+        public const string Angry = "Angry";
+    }
 }

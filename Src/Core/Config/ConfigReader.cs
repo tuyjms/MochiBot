@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using MochiBot.Src.Core.Config.Models;
 using MochiBot.Src.Core.Events;
+using static MochiBot.Src.Core.Constants;
 
 namespace MochiBot.Src.Core.Config
 {
@@ -96,25 +97,26 @@ namespace MochiBot.Src.Core.Config
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
+            var defaultMs = new ModuleSettings();
+
             var defaultConfig = new
             {
                 Providers = new Dictionary<string, Models.ProviderConfig>
                 {
-                    ["LocalLMStudio"] = new Models.ProviderConfig
+                    [Models.ProviderConfig.DefaultProviderName] = new Models.ProviderConfig
                     {
-                        ApiKey = "not-needed",
-                        BaseUrl = "http://localhost:1234/v1",
-                        ContextLimit = 4096
+                        ApiKey = Models.ProviderConfig.DefaultApiKey,
+                        BaseUrl = Models.ProviderConfig.DefaultBaseUrl,
                     }
                 },
                 AppSettings = new AppSettings(),
-                ModuleSettings = new ModuleSettings(),
+                ModuleSettings = defaultMs,
                 CronTasks = new List<CronTask>
                 {
-                    new() { Id = "builtin:murmur", Name = "碎碎念", TaskType = "murmur", CronExpression = "*/30 * * * *", Parameters = "30", Enabled = true },
-                    new() { Id = "builtin:eye_rest", Name = "用眼提醒", TaskType = "eye_rest", CronExpression = "*/5 * * * *", Parameters = "120", Enabled = true },
-                    new() { Id = "builtin:late_night", Name = "深夜关怀", TaskType = "late_night", CronExpression = "0 23 * * *", Parameters = "-30,30", Enabled = true },
-                    new() { Id = "builtin:idle_check", Name = "空闲检测", TaskType = "idle_check", CronExpression = "*/2 * * * *", Parameters = "5", Enabled = true }
+                    new() { Id = BuiltinTasks.IdMurmur, Name = BuiltinTasks.NameMurmur, TaskType = BuiltinTasks.Murmur, CronExpression = "*/30 * * * *", Parameters = defaultMs.AutoEvent_MurmurInterval.ToString(), Enabled = true },
+                    new() { Id = BuiltinTasks.IdEyeRest, Name = BuiltinTasks.NameEyeRest, TaskType = BuiltinTasks.EyeRest, CronExpression = "*/5 * * * *", Parameters = defaultMs.AutoEvent_EyeRestInterval.ToString(), Enabled = true },
+                    new() { Id = BuiltinTasks.IdLateNight, Name = BuiltinTasks.NameLateNight, TaskType = BuiltinTasks.LateNight, CronExpression = "0 23 * * *", Parameters = $"{defaultMs.AutoEvent_LateNightOffsetMin},{defaultMs.AutoEvent_LateNightOffsetMax}", Enabled = true },
+                    new() { Id = BuiltinTasks.IdIdleCheck, Name = BuiltinTasks.NameIdleCheck, TaskType = BuiltinTasks.IdleCheck, CronExpression = "*/2 * * * *", Parameters = defaultMs.AutoEvent_IdleThreshold.ToString(), Enabled = true }
                 }
             };
 
@@ -330,6 +332,122 @@ namespace MochiBot.Src.Core.Config
             SaveAppSettings(settings);
         }
 
+        /// <summary>
+        /// 保存 LLM 提供商配置到 appsettings.json 并刷新缓存
+        /// </summary>
+        public void SaveProviders(Dictionary<string, Models.ProviderConfig> providers)
+        {
+            try
+            {
+                var json = File.ReadAllText(_configPath);
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                var dict = new Dictionary<string, object?>();
+
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.Name == "Providers")
+                    {
+                        dict["Providers"] = providers;
+                    }
+                    else
+                    {
+                        dict[prop.Name] = JsonSerializer.Deserialize<object>(prop.Value.GetRawText());
+                    }
+                }
+
+                var newJson = JsonSerializer.Serialize(dict, options);
+                File.WriteAllText(_configPath, newJson);
+
+                Reload();
+                Logger.Info("[ConfigReader] 提供商配置已保存");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("[ConfigReader] 保存提供商配置失败", ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 保存模块参数配置到 appsettings.json 并刷新缓存
+        /// </summary>
+        public void SaveModuleSettings(ModuleSettings settings)
+        {
+            try
+            {
+                var json = File.ReadAllText(_configPath);
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                var dict = new Dictionary<string, object?>();
+
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.Name == "ModuleSettings")
+                    {
+                        dict["ModuleSettings"] = settings;
+                    }
+                    else
+                    {
+                        dict[prop.Name] = JsonSerializer.Deserialize<object>(prop.Value.GetRawText());
+                    }
+                }
+
+                var newJson = JsonSerializer.Serialize(dict, options);
+                File.WriteAllText(_configPath, newJson);
+
+                Reload();
+                Logger.Info("[ConfigReader] 模块参数配置已保存");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("[ConfigReader] 保存模块参数配置失败", ex);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 保存人格配置到对应的 *_person.json 文件
+        /// </summary>
+        public void SavePersonality(string personalityName, PersonalityConfig config)
+        {
+            if (!IsValidPersonalityName(personalityName))
+            {
+                Logger.Warn($"[ConfigReader] 无效的人格名称: {personalityName}");
+                throw new ArgumentException($"无效的人格名称: {personalityName}", nameof(personalityName));
+            }
+
+            try
+            {
+                var fileName = $"{personalityName.ToLowerInvariant()}_person.json";
+                var filePath = Path.Combine(_personalitiesDir, fileName);
+
+                if (!Directory.Exists(_personalitiesDir))
+                    Directory.CreateDirectory(_personalitiesDir);
+
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                var json = JsonSerializer.Serialize(config, options);
+                File.WriteAllText(filePath, json);
+
+                // 如果保存的是当前激活的人格，清除缓存以触发重新加载
+                if (_cachedAppConfig?.Settings.ActivePersonality == personalityName)
+                {
+                    _cachedPersonality = null;
+                }
+
+                Logger.Info($"[ConfigReader] 人格配置已保存: {filePath}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("[ConfigReader] 保存人格配置失败", ex);
+                throw;
+            }
+        }
+
         // ========== 人物名称合法性检查 ==========
 
         /// <summary>
@@ -385,7 +503,7 @@ namespace MochiBot.Src.Core.Config
             var settings = new AppSettings();
             if (root.TryGetProperty("AppSettings", out var appSettingsElement))
             {
-                settings.UserName = GetStringProperty(appSettingsElement, "UserName", "主人");
+                settings.UserName = GetStringProperty(appSettingsElement, "UserName", UserDefaults.DefaultUserName);
                 settings.ActivePersonality = GetStringProperty(appSettingsElement, "ActivePersonality", "default");
                 settings.EnableStructuredResponse = GetBoolProperty(appSettingsElement, "EnableStructuredResponse", true);
                 settings.MaxActionsPerResponse = GetIntProperty(appSettingsElement, "MaxActionsPerResponse", 5);

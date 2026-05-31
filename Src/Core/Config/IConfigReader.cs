@@ -72,6 +72,15 @@ namespace MochiBot.Src.Core.Config
         /// <summary>保存激活人格名称到 appsettings.json</summary>
         void SaveActivePersonality(string personalityName);
 
+        /// <summary>保存 LLM 提供商配置到 appsettings.json</summary>
+        void SaveProviders(Dictionary<string, ProviderConfig> providers);
+
+        /// <summary>保存模块参数配置到 appsettings.json</summary>
+        void SaveModuleSettings(ModuleSettings settings);
+
+        /// <summary>保存人格配置到对应的 *_person.json 文件</summary>
+        void SavePersonality(string personalityName, PersonalityConfig config);
+
 
         // ========== 配置重载 ==========
 

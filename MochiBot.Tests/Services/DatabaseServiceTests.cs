@@ -1,6 +1,7 @@
 using MochiBot.Src.Core.Database;
 using MochiBot.Src.Core.Database.Models;
 using MochiBot.Src.EventModels;
+using static MochiBot.Src.EventModels.MoodEventTypes;
 using MochiBot.Src.Services;
 namespace MochiBot.Tests;
 
@@ -142,13 +143,13 @@ public class DatabaseServiceTests : IDisposable
     public async Task LogMood_ShouldBeRetrievable()
     {
         await _moodLogRepo.LogMoodChangeAsync(AgentMood.Happy, "UserCompliment");
-        await _moodLogRepo.LogMoodChangeAsync(AgentMood.Sleepy, "LateNight");
+        await _moodLogRepo.LogMoodChangeAsync(AgentMood.Sleepy, LateNight);
 
         var logs = await _moodLogRepo.GetMoodLogAsync(DateTime.MinValue, DateTime.MaxValue);
 
         Assert.Equal(2, logs.Count);
         Assert.Contains(logs, l => l.Mood == AgentMood.Happy && l.Trigger == "UserCompliment");
-        Assert.Contains(logs, l => l.Mood == AgentMood.Sleepy && l.Trigger == "LateNight");
+        Assert.Contains(logs, l => l.Mood == AgentMood.Sleepy && l.Trigger == LateNight);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using MochiBot.Src.EventModels;
 using MochiBot.Src.Services;
+using static MochiBot.Src.Core.Constants;
 
 namespace MochiBot.Src.Agent
 {
@@ -47,27 +48,27 @@ namespace MochiBot.Src.Agent
                 {
                     switch (action.Type)
                     {
-                        case "tool_call":
+                        case ActionTypes.ToolCall:
                             replyText = await HandleToolCallAsync(action, replyText);
                             break;
 
-                        case "plugin_call":
+                        case ActionTypes.PluginCall:
                             await HandlePluginCallAsync(action);
                             break;
 
-                        case "mcp_call":
+                        case ActionTypes.McpCall:
                             await HandleMcpCallAsync(action);
                             break;
 
-                        case "mood_change":
+                        case ActionTypes.MoodChange:
                             HandleMoodChange(action);
                             break;
 
-                        case "midterm_memory":
+                        case ActionTypes.MidtermMemory:
                             HandleMidtermMemory(action);
                             break;
 
-                        case "animation":
+                        case ActionTypes.Animation:
                             HandleAnimation(action);
                             break;
                     }
@@ -164,7 +165,7 @@ namespace MochiBot.Src.Agent
         private async Task<string> HandleToolCallAsync(AgentAction action, string currentReply)
         {
             // 如果是 reply 工具，提取回复文本
-            if (action.Name == "reply" && !string.IsNullOrEmpty(action.Parameters))
+            if (action.Name == Tools.Reply && !string.IsNullOrEmpty(action.Parameters))
             {
                 try
                 {

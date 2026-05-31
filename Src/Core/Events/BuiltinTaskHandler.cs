@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using MochiBot.Src.EventModels;
+using static MochiBot.Src.Core.Constants;
 
 namespace MochiBot.Src.Core.Events
 {
@@ -52,16 +53,16 @@ namespace MochiBot.Src.Core.Events
                 var type = typeProp.GetString();
                 switch (type)
                 {
-                    case "murmur":
+                    case BuiltinTasks.Murmur:
                         HandleMurmur(eventData);
                         break;
-                    case "eye_rest":
+                    case BuiltinTasks.EyeRest:
                         HandleEyeRest(eventData);
                         break;
-                    case "late_night":
+                    case BuiltinTasks.LateNight:
                         HandleLateNight(eventData);
                         break;
-                    case "idle_check":
+                    case BuiltinTasks.IdleCheck:
                         HandleIdleCheck(eventData);
                         break;
                 }
@@ -98,7 +99,7 @@ namespace MochiBot.Src.Core.Events
                 {
                     Category = EventCategory.SystemAuto,
                     Trigger = EventTrigger.System,
-                    Info = JsonSerializer.Serialize(new { type = "murmur", name = "碎碎念" })
+                    Info = JsonSerializer.Serialize(new { type = BuiltinTasks.Murmur, name = BuiltinTasks.NameMurmur })
                 });
             }
         }
@@ -132,7 +133,7 @@ namespace MochiBot.Src.Core.Events
                 {
                     Category = EventCategory.SystemAuto,
                     Trigger = EventTrigger.System,
-                    Info = JsonSerializer.Serialize(new { type = "eye_rest", hours, name = "用眼提醒" })
+                    Info = JsonSerializer.Serialize(new { type = BuiltinTasks.EyeRest, hours, name = BuiltinTasks.NameEyeRest })
                 });
             }
         }
@@ -154,7 +155,7 @@ namespace MochiBot.Src.Core.Events
                 {
                     Category = EventCategory.SystemAuto,
                     Trigger = EventTrigger.System,
-                    Info = JsonSerializer.Serialize(new { type = "late_night", name = "深夜关怀" })
+                    Info = JsonSerializer.Serialize(new { type = BuiltinTasks.LateNight, name = BuiltinTasks.NameLateNight })
                 });
             }
         }
@@ -184,7 +185,7 @@ namespace MochiBot.Src.Core.Events
                 {
                     Category = EventCategory.SystemAuto,
                     Trigger = EventTrigger.System,
-                    Info = JsonSerializer.Serialize(new { type = "idle", minutes = (int)idleMinutes, name = "空闲检测" })
+                    Info = JsonSerializer.Serialize(new { type = BuiltinTasks.Idle, minutes = (int)idleMinutes, name = BuiltinTasks.NameIdleCheck })
                 });
             }
         }

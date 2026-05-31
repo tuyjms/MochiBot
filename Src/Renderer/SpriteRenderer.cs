@@ -2,6 +2,7 @@
 using System.Drawing.Imaging;
 using System.IO;
 using System.Timers;
+using static MochiBot.Src.Core.Constants;
 
 namespace MochiBot.Src.Renderer
 {
@@ -57,7 +58,7 @@ namespace MochiBot.Src.Renderer
         }
 
         /// <summary>动画类型</summary>
-        public string AnimationType => _config?.Type ?? "png";
+        public string AnimationType => _config?.Type ?? SpriteTypes.Png;
 
         /// <summary>是否循环播放</summary>
         public bool Loop => _config?.Loop ?? true;
@@ -109,11 +110,11 @@ namespace MochiBot.Src.Renderer
 
             switch (config.Type.ToLower())
             {
-                case "sprite":
+                case SpriteTypes.Sprite:
                     return LoadSpriteSheet(basePath);
-                case "gif":
+                case SpriteTypes.Gif:
                     return LoadGif(basePath);
-                case "png":
+                case SpriteTypes.Png:
                     return LoadSinglePng(basePath);
                 default:
                     return false;

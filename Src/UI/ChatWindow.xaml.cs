@@ -5,7 +5,8 @@ using System.Windows.Input;
 using MochiBot.Src.Core.Config;
 using MochiBot.Src.Core.Events;
 using MochiBot.Src.EventModels;
-using EventTrigger = MochiBot.Src.EventModels.EventTrigger;
+using static MochiBot.Src.Core.Constants;
+using EventTrigger1 = MochiBot.Src.EventModels.EventTrigger;
 
 namespace MochiBot.Src.UI
 {
@@ -51,7 +52,7 @@ namespace MochiBot.Src.UI
         private void LoadCharacterName()
         {
             var personality = _configReader.GetActivePersonality();
-            var characterName = personality?.Name ?? "小琪";
+            var characterName = personality?.Name ?? CharacterDefaults.DefaultName;
 
             // 更新窗口标题
             Title = characterName;
@@ -61,7 +62,7 @@ namespace MochiBot.Src.UI
                 nameText.Text = characterName;
 
             if (FindName("characterAvatarText") is System.Windows.Controls.TextBlock avatarText)
-                avatarText.Text = characterName.Length > 0 ? characterName[..1] : "琪";
+                avatarText.Text = characterName.Length > 0 ? characterName[..1] : CharacterDefaults.DefaultAvatarText;
         }
 
         private void SubscribeToReplyEvents()
@@ -78,7 +79,7 @@ namespace MochiBot.Src.UI
                             if (doc.RootElement.TryGetProperty("type", out var typeProp))
                             {
                                 var type = typeProp.GetString();
-                                if (type == "reply")
+                                if (type == Tools.Reply)
                                 {
                                     var content = doc.RootElement.TryGetProperty("content", out var contentProp)
                                         ? contentProp.GetString() ?? ""
@@ -155,7 +156,7 @@ namespace MochiBot.Src.UI
                 _eventDispatcher.Publish(new EventData
                 {
                     Category = EventCategory.UserInput,
-                    Trigger = EventTrigger.User,
+                    Trigger = EventTrigger1.User,
                     Info = text
                 });
             }

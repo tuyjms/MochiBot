@@ -5,6 +5,12 @@
     /// </summary>
     public class ModuleSettings
     {
+        /// <summary>合法溢出策略选项</summary>
+        public static readonly string[] ValidOverflowStrategies = { "Truncate", "Summarize" };
+
+        /// <summary>碎碎念权重上限 (0-100)</summary>
+        public const int MaxMurmurWeight = 100;
+
         // ========== 短期记忆 ==========
         public int ShortTermMemory_Capacity { get; set; } = 50;
         public int ShortTermMemory_TrimThreshold { get; set; } = 40;
@@ -70,21 +76,6 @@
             "你眼睛有点红红的，是不是又熬夜了…",
             "那个…我可以一直待在你身边吗？",
             "嘿嘿，你今天的笑容特别好看～"
-        };
-
-        /// <summary>夸奖文本列表（LLM 调用失败时的 fallback）</summary>
-        public List<string> ComplimentTemplates { get; set; } = new()
-        {
-            "你今天的笑容特别好看，像阳光一样温暖～",
-            "你真的太棒了，每次和你聊天都很开心！",
-            "你知道吗？你认真做事的样子特别迷人～",
-            "有你在真好，你是我最重要的人！",
-            "你今天看起来特别精神，是不是有什么好事呀？",
-            "你总是能让我感到安心，谢谢你～",
-            "你的眼睛里有星星，特别好看！",
-            "和你在一起的每一刻都很幸福～",
-            "你真的很聪明，什么问题都难不倒你！",
-            "你是我见过最温柔的人～"
         };
     }
 }

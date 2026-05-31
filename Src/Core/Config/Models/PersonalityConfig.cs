@@ -6,6 +6,9 @@
     /// </summary>
     public class PersonalityConfig
     {
+        /// <summary>子人格权重总和必须为此值</summary>
+        public const int SubPersonalityWeightSum = 100;
+
         /// <summary>人物名称（仅允许中文、英文、数字、下划线，且不能以数字开头）</summary>
         public string Name { get; set; } = string.Empty;
 
