@@ -42,6 +42,7 @@ bld/
 
 # claude code
 .claude/
+.codegraph/
 
 # JetBrains Rider
 .idea/

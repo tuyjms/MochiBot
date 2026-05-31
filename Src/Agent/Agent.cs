@@ -93,6 +93,11 @@ namespace MochiBot.Src.Agent
             var maxMessages = _personality?.MaxMessages ?? 50;
             _shortTermMemory = new ShortTermMemory(maxMessages, _functionProviderName, _functionModelName, _configReader);
 
+            // 应用溢出策略配置
+            var strategyStr = _configReader.GetModuleSettings().ShortTermMemory_OverflowStrategy;
+            if (Enum.TryParse<OverflowStrategy>(strategyStr, true, out var strategy))
+                _shortTermMemory.OverflowStrategy = strategy;
+
             // 自创建 LongMemory（使用函数调用模型，自维护LlmClient）
             _longMemory = new LongMemory(_functionProviderName, _functionModelName, _configReader);
 
@@ -447,6 +452,12 @@ namespace MochiBot.Src.Agent
 
             // 1. 记录用户消息到短期记忆
             _shortTermMemory.AddMessage("user", userMessage);
+
+            // 检查是否需要触发短期记忆总结
+            if (_shortTermMemory.IsSummarizePending)
+            {
+                await _shortTermMemory.SummarizeAsync();
+            }
 
             // 2. 构建完整 Prompt
             var systemPrompt = BuildSystemPrompt();

@@ -47,5 +47,8 @@ namespace MochiBot.Src.Agent
         /// <summary>手动触发LLM总结（将旧记忆压缩为摘要）</summary>
         Task<string> SummarizeAsync();
 
+        /// <summary>是否有待执行的总结（溢出时自动标记）</summary>
+        bool IsSummarizePending { get; }
+
     }
 }

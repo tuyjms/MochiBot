@@ -1,8 +1,17 @@
 ﻿using MochiBot.Src.Agent;
+using MochiBot.Tests;
 namespace MochiBot.Tests;
 
-public class ShortTermMemoryTests
+[Collection("ConfigReader")]
+public class ShortTermMemoryTests : IDisposable
 {
+    public ShortTermMemoryTests()
+    {
+        TestConfigHelper.EnsureInitialized();
+    }
+
+    public void Dispose() { }
+
     // ========== 基本功能 ==========
 
     [Fact]
@@ -372,6 +381,95 @@ public class ShortTermMemoryTests
         Assert.Single(recent);
         Assert.True(recent[0].Timestamp >= before);
         Assert.True(recent[0].Timestamp <= after);
+    }
+
+    // ========== IsSummarizePending ==========
+
+    [Fact]
+    public void IsSummarizePending_Initial_ShouldBeFalse()
+    {
+        var memory = new ShortTermMemory(capacity: 5);
+        Assert.False(memory.IsSummarizePending);
+    }
+
+    [Fact]
+    public void IsSummarizePending_AfterOverflow_ShouldBeTrue()
+    {
+        var memory = new ShortTermMemory(capacity: 3);
+        memory.OverflowStrategy = OverflowStrategy.Summarize;
+
+        memory.AddMessage("user", "msg1");
+        memory.AddMessage("user", "msg2");
+        memory.AddMessage("user", "msg3");
+        Assert.False(memory.IsSummarizePending); // 未溢出
+
+        memory.AddMessage("user", "msg4"); // 溢出
+        Assert.True(memory.IsSummarizePending);
+    }
+
+    [Fact]
+    public void IsSummarizePending_TruncateMode_ShouldStayFalse()
+    {
+        var memory = new ShortTermMemory(capacity: 3);
+        memory.OverflowStrategy = OverflowStrategy.Truncate;
+
+        memory.AddMessage("user", "msg1");
+        memory.AddMessage("user", "msg2");
+        memory.AddMessage("user", "msg3");
+        memory.AddMessage("user", "msg4"); // 溢出
+
+        Assert.False(memory.IsSummarizePending);
+    }
+
+    [Fact]
+    public async Task IsSummarizePending_AfterSummarize_ShouldBeFalse()
+    {
+        var memory = new ShortTermMemory(capacity: 20);
+        memory.OverflowStrategy = OverflowStrategy.Summarize;
+
+        for (int i = 1; i <= 20; i++)
+            memory.AddMessage("user", $"msg{i}");
+
+        // 第 21 条触发溢出（buffer 已满）
+        memory.AddMessage("user", "msg21");
+        Assert.True(memory.IsSummarizePending);
+
+        await memory.SummarizeAsync();
+        Assert.False(memory.IsSummarizePending);
+    }
+
+    [Fact]
+    public void IsSummarizePending_AfterClear_ShouldBeFalse()
+    {
+        var memory = new ShortTermMemory(capacity: 3);
+        memory.OverflowStrategy = OverflowStrategy.Summarize;
+
+        memory.AddMessage("user", "msg1");
+        memory.AddMessage("user", "msg2");
+        memory.AddMessage("user", "msg3");
+        memory.AddMessage("user", "msg4");
+
+        Assert.True(memory.IsSummarizePending);
+        memory.Clear();
+        Assert.False(memory.IsSummarizePending);
+    }
+
+    // ========== SummarizeAsync 保留最近消息 ==========
+
+    [Fact]
+    public async Task SummarizeAsync_ShouldPreserveRecentMessages()
+    {
+        var memory = new ShortTermMemory(capacity: 20);
+        for (int i = 1; i <= 15; i++)
+            memory.AddMessage("user", $"msg{i}");
+
+        await memory.SummarizeAsync();
+
+        var all = memory.GetAllMessages();
+        // 第0条是system摘要，第1-10条是保留的最近消息
+        Assert.Equal("system", all[0].Role);
+        Assert.Equal("msg6", all[1].Content);  // 保留从第6条开始（15-10+1=6）
+        Assert.Equal("msg15", all[10].Content);
     }
 
     // ========== 边界情况 ==========

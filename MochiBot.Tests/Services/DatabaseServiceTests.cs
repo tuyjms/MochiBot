@@ -1,20 +1,26 @@
 using MochiBot.Src.Core.Database;
 using MochiBot.Src.Core.Database.Models;
 using MochiBot.Src.EventModels;
+using MochiBot.Src.Services;
 namespace MochiBot.Tests;
 
 public class DatabaseServiceTests : IDisposable
 {
     private readonly string _testDbPath;
-    private readonly string _connectionString;
     private readonly DatabaseService _db;
+    private readonly UserConfigRepository _userConfigRepo;
+    private readonly ChatHistoryRepository _chatHistoryRepo;
+    private readonly MoodLogRepository _moodLogRepo;
 
     public DatabaseServiceTests()
     {
-        // 每个测试使用独立的 SQLite 内存数据库
+        // 每个测试使用独立的 SQLite 数据库文件
         _testDbPath = Path.Combine(Path.GetTempPath(), $"mochibot_test_{Guid.NewGuid()}.db");
-        _connectionString = $"Data Source={_testDbPath}";
-        _db = new DatabaseService(_connectionString);
+        var connectionString = $"Data Source={_testDbPath}";
+        _db = new DatabaseService(connectionString);
+        _userConfigRepo = new UserConfigRepository(_db);
+        _chatHistoryRepo = new ChatHistoryRepository(_db);
+        _moodLogRepo = new MoodLogRepository(_db);
     }
 
     public void Dispose()
@@ -38,7 +44,7 @@ public class DatabaseServiceTests : IDisposable
     [Fact]
     public async Task LoadConfig_Default_ShouldReturnDefaultValues()
     {
-        var config = await _db.LoadConfigAsync();
+        var config = await _userConfigRepo.LoadConfigAsync();
 
         Assert.Equal("小可爱", config.Name);
         Assert.Equal("温柔", config.Personality);
@@ -61,8 +67,8 @@ public class DatabaseServiceTests : IDisposable
             WindowPosY = 300
         };
 
-        await _db.SaveConfigAsync(config);
-        var loaded = await _db.LoadConfigAsync();
+        await _userConfigRepo.SaveConfigAsync(config);
+        var loaded = await _userConfigRepo.LoadConfigAsync();
 
         Assert.Equal(config.Name, loaded.Name);
         Assert.Equal(config.Personality, loaded.Personality);
@@ -77,11 +83,11 @@ public class DatabaseServiceTests : IDisposable
     public async Task SaveConfig_UpdateExisting_ShouldOverwrite()
     {
         // 第一次保存
-        await _db.SaveConfigAsync(new UserConfig { Name = "版本1" });
+        await _userConfigRepo.SaveConfigAsync(new UserConfig { Name = "版本1" });
         // 第二次保存
-        await _db.SaveConfigAsync(new UserConfig { Name = "版本2" });
+        await _userConfigRepo.SaveConfigAsync(new UserConfig { Name = "版本2" });
 
-        var loaded = await _db.LoadConfigAsync();
+        var loaded = await _userConfigRepo.LoadConfigAsync();
         Assert.Equal("版本2", loaded.Name);
     }
 
@@ -96,8 +102,8 @@ public class DatabaseServiceTests : IDisposable
             new() { Role = "assistant", Content = "你好呀～", Timestamp = new DateTime(2026, 1, 1, 10, 0, 5) }
         };
 
-        await _db.SaveChatHistoryAsync(messages);
-        var loaded = await _db.LoadChatHistoryAsync(10);
+        await _chatHistoryRepo.SaveChatHistoryAsync(messages);
+        var loaded = await _chatHistoryRepo.LoadChatHistoryAsync(10);
 
         Assert.Equal(2, loaded.Count);
         Assert.Equal("user", loaded[0].Role);
@@ -112,11 +118,11 @@ public class DatabaseServiceTests : IDisposable
         var messages = new List<ChatMessage>();
         for (int i = 0; i < 10; i++)
         {
-            messages.Add(new ChatMessage { Role = "user", Content = $"msg{i}" });
+            messages.Add(new ChatMessage { Role = "user", Content = $"msg{i}", Timestamp = DateTime.Now });
         }
 
-        await _db.SaveChatHistoryAsync(messages);
-        var loaded = await _db.LoadChatHistoryAsync(limit: 3);
+        await _chatHistoryRepo.SaveChatHistoryAsync(messages);
+        var loaded = await _chatHistoryRepo.LoadChatHistoryAsync(limit: 3);
 
         Assert.Equal(3, loaded.Count);
         Assert.Equal("msg7", loaded[0].Content);
@@ -126,7 +132,7 @@ public class DatabaseServiceTests : IDisposable
     [Fact]
     public async Task LoadChatHistory_Empty_ShouldReturnEmptyList()
     {
-        var loaded = await _db.LoadChatHistoryAsync();
+        var loaded = await _chatHistoryRepo.LoadChatHistoryAsync();
         Assert.Empty(loaded);
     }
 
@@ -135,10 +141,10 @@ public class DatabaseServiceTests : IDisposable
     [Fact]
     public async Task LogMood_ShouldBeRetrievable()
     {
-        await _db.LogMoodChangeAsync(AgentMood.Happy, "UserCompliment");
-        await _db.LogMoodChangeAsync(AgentMood.Sleepy, "LateNight");
+        await _moodLogRepo.LogMoodChangeAsync(AgentMood.Happy, "UserCompliment");
+        await _moodLogRepo.LogMoodChangeAsync(AgentMood.Sleepy, "LateNight");
 
-        var logs = await _db.GetMoodLogAsync(DateTime.MinValue, DateTime.MaxValue);
+        var logs = await _moodLogRepo.GetMoodLogAsync(DateTime.MinValue, DateTime.MaxValue);
 
         Assert.Equal(2, logs.Count);
         Assert.Contains(logs, l => l.Mood == AgentMood.Happy && l.Trigger == "UserCompliment");
@@ -148,26 +154,26 @@ public class DatabaseServiceTests : IDisposable
     [Fact]
     public async Task GetMoodLog_ShouldFilterByTimeRange()
     {
-        await _db.LogMoodChangeAsync(AgentMood.Happy, "Event1");
-        await _db.LogMoodChangeAsync(AgentMood.Sad, "Event2");
+        await _moodLogRepo.LogMoodChangeAsync(AgentMood.Happy, "Event1");
+        await _moodLogRepo.LogMoodChangeAsync(AgentMood.Sad, "Event2");
 
         // 查询未来时间范围，应该没有结果
         var futureStart = new DateTime(2099, 1, 1);
         var futureEnd = new DateTime(2099, 12, 31);
-        var emptyLogs = await _db.GetMoodLogAsync(futureStart, futureEnd);
+        var emptyLogs = await _moodLogRepo.GetMoodLogAsync(futureStart, futureEnd);
         Assert.Empty(emptyLogs);
 
         // 查询所有时间范围，应该有2条
-        var allLogs = await _db.GetMoodLogAsync(DateTime.MinValue, DateTime.MaxValue);
+        var allLogs = await _moodLogRepo.GetMoodLogAsync(DateTime.MinValue, DateTime.MaxValue);
         Assert.Equal(2, allLogs.Count);
     }
 
     [Fact]
     public async Task GetMoodLog_EmptyRange_ShouldReturnEmpty()
     {
-        await _db.LogMoodChangeAsync(AgentMood.Happy, "Test");
+        await _moodLogRepo.LogMoodChangeAsync(AgentMood.Happy, "Test");
 
-        var logs = await _db.GetMoodLogAsync(
+        var logs = await _moodLogRepo.GetMoodLogAsync(
             new DateTime(2020, 1, 1),
             new DateTime(2020, 12, 31));
 

@@ -16,7 +16,10 @@ namespace MochiBot.Src.Agent
         private LlmClient? _llmClient;
         private OverflowStrategy _overflowStrategy = OverflowStrategy.Truncate;
         private string? _contextSummary;
+        private bool _summarizePending = false;
         private readonly IConfigReader _configReader;
+
+        public bool IsSummarizePending => _summarizePending;
 
         private const int DefaultCapacity = 50;
         private const int SummaryReservedCount = 10;
@@ -98,8 +101,8 @@ namespace MochiBot.Src.Agent
                 }
                 else if (_overflowStrategy == OverflowStrategy.Summarize)
                 {
-                    // Summarize 策略：需要外部调用 SummarizeAsync 处理
-                    // 这里先按 Truncate 方式添加，由外部在适当时机调用 SummarizeAsync
+                    // 标记需要总结，由 Agent 在适当时机调用 SummarizeAsync
+                    _summarizePending = true;
                     _buffer[_head] = message;
                     _head = (_head + 1) % _capacity;
                 }
@@ -142,6 +145,7 @@ namespace MochiBot.Src.Agent
             _head = 0;
             _count = 0;
             _contextSummary = null;
+            _summarizePending = false;
         }
 
         public async Task<string> SummarizeAsync()
@@ -190,6 +194,7 @@ namespace MochiBot.Src.Agent
             // 重建缓冲区：摘要(system角色) + 保留的最近消息
             Clear();
             _contextSummary = summary;
+            _summarizePending = false;
             AddMessage("system", summary);
             foreach (var msg in reservedMessages)
             {
