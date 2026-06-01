@@ -448,6 +448,45 @@ namespace MochiBot.Src.Core.Config
             }
         }
 
+        /// <summary>
+        /// 删除指定人格的 *_person.json 文件
+        /// </summary>
+        public void DeletePersonality(string personalityName)
+        {
+            if (!IsValidPersonalityName(personalityName))
+            {
+                Logger.Warn($"[ConfigReader] 无效的人格名称: {personalityName}");
+                throw new ArgumentException($"无效的人格名称: {personalityName}", nameof(personalityName));
+            }
+
+            try
+            {
+                var fileName = $"{personalityName.ToLowerInvariant()}_person.json";
+                var filePath = Path.Combine(_personalitiesDir, fileName);
+
+                if (!File.Exists(filePath))
+                {
+                    Logger.Warn($"[ConfigReader] 人格配置文件不存在: {filePath}");
+                    return;
+                }
+
+                File.Delete(filePath);
+
+                // 如果删除的是当前激活的人格，清除缓存
+                if (_cachedAppConfig?.Settings.ActivePersonality == personalityName)
+                {
+                    _cachedPersonality = null;
+                }
+
+                Logger.Info($"[ConfigReader] 人格配置已删除: {filePath}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("[ConfigReader] 删除人格配置失败", ex);
+                throw;
+            }
+        }
+
         // ========== 人物名称合法性检查 ==========
 
         /// <summary>

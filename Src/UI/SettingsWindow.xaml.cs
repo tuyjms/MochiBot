@@ -266,7 +266,7 @@ namespace MochiBot.Src.UI
 
         private void AddChatModel_Click(object sender, RoutedEventArgs e)
         {
-            var input = Microsoft.VisualBasic.Interaction.InputBox("输入模型名称（格式: Provider/Model）", "添加聊天模型", "");
+            var input = ShowInputDialog("输入模型名称（格式: Provider/Model）", "添加聊天模型");
             if (!string.IsNullOrWhiteSpace(input))
                 _chatModels.Add(input.Trim());
         }
@@ -286,6 +286,78 @@ namespace MochiBot.Src.UI
         {
             if (subPersonalitiesGrid.SelectedItem is SubPersonalityViewModel selected)
                 _subPersonalities.Remove(selected);
+        }
+
+        private void AddPersonality_Click(object sender, RoutedEventArgs e)
+        {
+            var input = ShowInputDialog("输入人格名称（中文、英文、数字、下划线）", "新增人格");
+            if (string.IsNullOrWhiteSpace(input)) return;
+
+            var name = input.Trim();
+            if (!ConfigReader.IsValidPersonalityName(name))
+            {
+                MessageBox.Show("人格名称无效，只能包含中文、英文、数字、下划线，且不能以数字开头", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (_personalityCache.ContainsKey(name))
+            {
+                MessageBox.Show($"人格 \"{name}\" 已存在", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                var config = new PersonalityConfig { Name = name };
+                _configReader.SavePersonality(name, config);
+                _personalityCache[name] = config;
+
+                RefreshPersonalitySelector();
+                personalitySelector.SelectedItem = name;
+            }
+            catch (Exception ex)
+            {
+                _configReader.Logger.Error("[Settings] 新增人格失败", ex);
+                MessageBox.Show($"新增人格失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void RemovePersonality_Click(object sender, RoutedEventArgs e)
+        {
+            if (personalitySelector.SelectedItem is not string name) return;
+
+            var activeName = activePersonalityBox.SelectedItem?.ToString();
+            if (name == activeName)
+            {
+                MessageBox.Show("不能删除当前激活的人格，请先切换到其他人格", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var confirm = MessageBox.Show($"确定要删除人格 \"{name}\" 吗？此操作不可撤销。", "确认删除",
+                MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (confirm != MessageBoxResult.Yes) return;
+
+            try
+            {
+                _configReader.DeletePersonality(name);
+                _personalityCache.Remove(name);
+
+                RefreshPersonalitySelector();
+
+                if (personalitySelector.Items.Count > 0)
+                    personalitySelector.SelectedIndex = 0;
+            }
+            catch (Exception ex)
+            {
+                _configReader.Logger.Error("[Settings] 删除人格失败", ex);
+                MessageBox.Show($"删除人格失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void RefreshPersonalitySelector()
+        {
+            var personalities = _configReader.GetAvailablePersonalities();
+            personalitySelector.ItemsSource = personalities;
         }
 
         private void UpdateWeightSum()
@@ -324,14 +396,6 @@ namespace MochiBot.Src.UI
             ltImmediateThresholdBox.Text = ms.LongTermMemory_ImmediateThreshold.ToString();
             ltMaxEntriesBox.Text = ms.LongTermMemory_MaxEntries.ToString();
             ltSearchTopNBox.Text = ms.LongTermMemory_SearchTopN.ToString();
-
-            // 自动事件
-            murmurIntervalModuleBox.Text = ms.AutoEvent_MurmurInterval.ToString();
-            murmurWeightBox.Text = ms.AutoEvent_MurmurWeight.ToString();
-            murmurModuleEnabledCheck.IsChecked = ms.AutoEvent_MurmurEnabled;
-            eyeRestThresholdBox.Text = ms.AutoEvent_EyeRestInterval.ToString();
-            lateNightPeriodBox.Text = $"{ms.AutoEvent_LateNightStart}-{ms.AutoEvent_LateNightEnd}";
-            idleCheckThresholdBox.Text = ms.AutoEvent_IdleThreshold.ToString();
         }
 
         private bool TryCollectModuleSettings(out ModuleSettings ms)
@@ -395,35 +459,6 @@ namespace MochiBot.Src.UI
             if (!int.TryParse(ltSearchTopNBox.Text, out var ltSearch) || ltSearch < 1)
             { MessageBox.Show("长期记忆搜索返回数必须为正整数", "提示"); return false; }
             ms.LongTermMemory_SearchTopN = ltSearch;
-
-            // 自动事件
-            if (!int.TryParse(murmurIntervalModuleBox.Text, out var miInt) || miInt < 1)
-            { MessageBox.Show("碎碎念间隔必须为正整数", "提示"); return false; }
-            ms.AutoEvent_MurmurInterval = miInt;
-
-            if (!int.TryParse(murmurWeightBox.Text, out var miWt) || miWt < 0 || miWt > ModuleSettings.MaxMurmurWeight)
-            { MessageBox.Show($"碎碎念权重必须在 0-{ModuleSettings.MaxMurmurWeight} 之间", "提示"); return false; }
-            ms.AutoEvent_MurmurWeight = miWt;
-
-            ms.AutoEvent_MurmurEnabled = murmurModuleEnabledCheck.IsChecked
-                ?? new ModuleSettings().AutoEvent_MurmurEnabled;
-
-            if (!int.TryParse(eyeRestThresholdBox.Text, out var eyeInt) || eyeInt < 1)
-            { MessageBox.Show("用眼提醒阈值必须为正整数", "提示"); return false; }
-            ms.AutoEvent_EyeRestInterval = eyeInt;
-
-            // 深夜时段解析
-            var periodText = lateNightPeriodBox.Text.Trim();
-            var parts = periodText.Split('-');
-            if (parts.Length == 2)
-            {
-                ms.AutoEvent_LateNightStart = parts[0].Trim();
-                ms.AutoEvent_LateNightEnd = parts[1].Trim();
-            }
-
-            if (!int.TryParse(idleCheckThresholdBox.Text, out var idleInt) || idleInt < 1)
-            { MessageBox.Show("空闲检测阈值必须为正整数", "提示"); return false; }
-            ms.AutoEvent_IdleThreshold = idleInt;
 
             return true;
         }
@@ -576,6 +611,45 @@ namespace MochiBot.Src.UI
         {
             DialogResult = false;
             Close();
+        }
+
+        /// <summary>显示带 Owner 的输入对话框，返回用户输入或 null</summary>
+        private string? ShowInputDialog(string prompt, string title)
+        {
+            var dialog = new Window
+            {
+                Title = title,
+                Width = 360,
+                Height = 150,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStyle = WindowStyle.ToolWindow,
+            };
+
+            var panel = new StackPanel { Margin = new Thickness(12) };
+            panel.Children.Add(new TextBlock { Text = prompt, FontSize = 13, Margin = new Thickness(0, 0, 0, 8) });
+
+            var textBox = new TextBox { Height = 28, FontSize = 14, Padding = new Thickness(4, 0, 4, 0) };
+            panel.Children.Add(textBox);
+
+            var btnPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
+            var okBtn = new Button { Content = "确定", Width = 70, Height = 28, FontSize = 13, IsDefault = true };
+            var cancelBtn = new Button { Content = "取消", Width = 70, Height = 28, FontSize = 13, Margin = new Thickness(8, 0, 0, 0), IsCancel = true };
+            btnPanel.Children.Add(okBtn);
+            btnPanel.Children.Add(cancelBtn);
+            panel.Children.Add(btnPanel);
+
+            dialog.Content = panel;
+
+            okBtn.Click += (_, _) => { dialog.DialogResult = true; };
+            textBox.TextChanged += (_, _) => { okBtn.IsEnabled = !string.IsNullOrWhiteSpace(textBox.Text); };
+            okBtn.IsEnabled = false;
+
+            // 打开后自动聚焦输入框
+            dialog.Loaded += (_, _) => textBox.Focus();
+
+            return dialog.ShowDialog() == true ? textBox.Text.Trim() : null;
         }
     }
 

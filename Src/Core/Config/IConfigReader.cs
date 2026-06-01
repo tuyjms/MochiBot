@@ -81,6 +81,9 @@ namespace MochiBot.Src.Core.Config
         /// <summary>保存人格配置到对应的 *_person.json 文件</summary>
         void SavePersonality(string personalityName, PersonalityConfig config);
 
+        /// <summary>删除指定人格的 *_person.json 文件</summary>
+        void DeletePersonality(string personalityName);
+
 
         // ========== 配置重载 ==========
 

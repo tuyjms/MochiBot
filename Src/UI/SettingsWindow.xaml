@@ -96,7 +96,19 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="8">
                     <StackPanel>
                         <!-- 人格选择 -->
-                        <Label Content="选择人格" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                        <Grid Margin="0,0,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Label Grid.Column="0" Content="选择人格" FontSize="13" FontWeight="SemiBold" Padding="0"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button Content="+" Width="28" Height="26" FontSize="14" FontWeight="Bold"
+                                        Click="AddPersonality_Click" Margin="0,0,4,0"/>
+                                <Button Content="-" Width="28" Height="26" FontSize="14" FontWeight="Bold"
+                                        Click="RemovePersonality_Click"/>
+                            </StackPanel>
+                        </Grid>
                         <ComboBox x:Name="personalitySelector" Height="30" FontSize="14" Margin="0,0,0,10"
                                   SelectionChanged="PersonalitySelector_Changed"/>
 
@@ -285,53 +297,6 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="搜索返回数" VerticalAlignment="Center" FontSize="13"/>
                                     <TextBox Grid.Column="1" x:Name="ltSearchTopNBox" Height="26" FontSize="13" TextAlignment="Center"/>
-                                </Grid>
-                            </StackPanel>
-                        </Expander>
-
-                        <!-- 自动事件 -->
-                        <Expander Header="自动事件" Margin="0,0,0,6">
-                            <StackPanel Margin="16,4,0,4">
-                                <Grid Margin="0,2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="80"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="碎碎念间隔(分)" VerticalAlignment="Center" FontSize="13"/>
-                                    <TextBox Grid.Column="1" x:Name="murmurIntervalModuleBox" Height="26" FontSize="13" TextAlignment="Center"/>
-                                </Grid>
-                                <Grid Margin="0,2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="80"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="碎碎念权重" VerticalAlignment="Center" FontSize="13"/>
-                                    <TextBox Grid.Column="1" x:Name="murmurWeightBox" Height="26" FontSize="13" TextAlignment="Center"/>
-                                </Grid>
-                                <CheckBox x:Name="murmurModuleEnabledCheck" Content="碎碎念启用" FontSize="13" Margin="0,4,0,2"/>
-                                <Grid Margin="0,2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="80"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="用眼提醒阈值" VerticalAlignment="Center" FontSize="13"/>
-                                    <TextBox Grid.Column="1" x:Name="eyeRestThresholdBox" Height="26" FontSize="13" TextAlignment="Center"/>
-                                </Grid>
-                                <Grid Margin="0,2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="80"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="深夜时段" VerticalAlignment="Center" FontSize="13"/>
-                                    <TextBox Grid.Column="1" x:Name="lateNightPeriodBox" Height="26" FontSize="13" TextAlignment="Center"/>
-                                </Grid>
-                                <Grid Margin="0,2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="80"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="空闲检测阈值" VerticalAlignment="Center" FontSize="13"/>
-                                    <TextBox Grid.Column="1" x:Name="idleCheckThresholdBox" Height="26" FontSize="13" TextAlignment="Center"/>
                                 </Grid>
                             </StackPanel>
                         </Expander>
