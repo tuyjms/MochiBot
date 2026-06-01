@@ -3,6 +3,21 @@
 namespace MochiBot.Src.Agent
 {
     /// <summary>
+    /// Agent 运行状态枚举
+    /// </summary>
+    public enum AgentState
+    {
+        /// <summary>空闲，等待事件</summary>
+        Idle,
+        /// <summary>正在处理事件（LLM 调用中）</summary>
+        Thinking,
+        /// <summary>热重载中（配置变更）</summary>
+        Reloading,
+        /// <summary>错误状态</summary>
+        Error
+    }
+
+    /// <summary>
     /// Agent 状态摘要
     /// </summary>
     public class AgentStatus
@@ -13,6 +28,7 @@ namespace MochiBot.Src.Agent
         public int LongTermMemoryCount { get; set; }
         public bool IsProcessing { get; set; }
         public string LastEvent { get; set; } = string.Empty;
+        public AgentState State { get; set; } = AgentState.Idle;
     }
 
     /// <summary>

@@ -24,6 +24,9 @@ namespace MochiBot.Src.Core.Events
         private int _tickCount;
         private readonly List<CronTask> _tasks = new();
 
+        // ========== 模块状态管理 ==========
+        private readonly ConcurrentDictionary<string, string> _moduleStates = new();
+
         // ========== 事件发布/订阅 ==========
 
         public void Publish(EventData eventData)
@@ -406,6 +409,28 @@ namespace MochiBot.Src.Core.Events
             public string Id { get; set; } = string.Empty;
             public Action<EventData>? SyncHandler { get; set; }
             public Func<EventData, Task>? AsyncHandler { get; set; }
+        }
+
+        // ========== 模块状态管理 ==========
+
+        public void RegisterModule(string moduleId, string initialState)
+        {
+            _moduleStates[moduleId] = initialState;
+        }
+
+        public void UpdateModuleState(string moduleId, string state)
+        {
+            _moduleStates[moduleId] = state;
+        }
+
+        public string GetModuleState(string moduleId)
+        {
+            return _moduleStates.TryGetValue(moduleId, out var state) ? state : "unknown";
+        }
+
+        public IReadOnlyDictionary<string, string> GetAllModuleStates()
+        {
+            return _moduleStates;
         }
 
         public void Dispose()

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using MochiBot.Src.Core.Config;
 using MochiBot.Src.Core.Config.Models;
@@ -20,7 +21,7 @@ namespace MochiBot.Src.Agent
     /// 通过事件调度器接收事件，处理完成后发布回复事件
     /// 自管理 LlmClient、ShortTermMemory 和 LongMemory
     /// </summary>
-    public class MainAgent : IAgent
+    public class MainAgent : IAgent, IDisposable
     {
         private readonly IEventDispatcher _eventDispatcher;
         private readonly IConfigReader _configReader;
@@ -45,6 +46,12 @@ namespace MochiBot.Src.Agent
         private bool _isProcessing;
         private string _lastEvent = string.Empty;
         private string _lastJsonError = string.Empty;
+
+        // ========== 事件队列 + 状态机 ==========
+        private readonly ConcurrentQueue<EventData> _eventQueue = new();
+        private const int MaxQueueSize = 20;
+        private volatile AgentState _state = AgentState.Idle;
+        private readonly SemaphoreSlim _processLock = new(1, 1);
         private string _functionProviderName = string.Empty;
         private string _functionModelName = string.Empty;
 
@@ -140,6 +147,9 @@ namespace MochiBot.Src.Agent
 
             // 订阅事件调度器
             SubscribeToEvents();
+
+            // 注册模块状态
+            _eventDispatcher.RegisterModule("agent", AgentState.Idle.ToString().ToLower());
         }
 
         /// <summary>订阅事件调度器的事件</summary>
@@ -341,9 +351,76 @@ namespace MochiBot.Src.Agent
             }
         }
 
-        // ========== 统一事件处理 ==========
+        // ========== 统一事件处理（入队 + 触发处理循环） ==========
 
-        public async Task ProcessEventAsync(EventData eventData)
+        public Task ProcessEventAsync(EventData eventData)
+        {
+            // 队列满时丢弃最旧事件
+            while (_eventQueue.Count >= MaxQueueSize)
+            {
+                _eventQueue.TryDequeue(out _);
+                _configReader.Logger.Warn("[Agent] 事件队列已满，丢弃最旧事件");
+            }
+
+            _eventQueue.Enqueue(eventData);
+            _configReader.Logger.Debug($"[Agent] 事件已入队: {eventData.Category}, 队列长度: {_eventQueue.Count}");
+
+            TryStartProcessing();
+            return Task.CompletedTask;
+        }
+
+        // ========== 状态机 ==========
+
+        /// <summary>尝试启动处理循环（仅 Idle 状态可启动）</summary>
+        private void TryStartProcessing()
+        {
+            if (_state != AgentState.Idle) return;
+            if (!_processLock.Wait(0)) return;
+
+            _ = ProcessQueueAsync();
+        }
+
+        /// <summary>事件处理循环：从队列逐个取出事件串行处理</summary>
+        private async Task ProcessQueueAsync()
+        {
+            try
+            {
+                while (_eventQueue.TryDequeue(out var eventData))
+                {
+                    SetState(AgentState.Thinking);
+                    try
+                    {
+                        await ProcessEventInternalAsync(eventData);
+                    }
+                    catch (Exception ex)
+                    {
+                        _configReader.Logger.Error($"[Agent] 处理事件异常: {eventData.Category}", ex);
+                        SetState(AgentState.Error);
+                        await Task.Delay(1000); // 错误冷却
+                    }
+                    finally
+                    {
+                        SetState(AgentState.Idle);
+                    }
+                }
+            }
+            finally
+            {
+                _processLock.Release();
+            }
+        }
+
+        /// <summary>设置 Agent 状态并上报到 EventDispatcher</summary>
+        private void SetState(AgentState newState)
+        {
+            if (_state == newState) return;
+            _state = newState;
+            _configReader.Logger.Debug($"[Agent] 状态: {newState}");
+            _eventDispatcher.UpdateModuleState("agent", newState.ToString().ToLower());
+        }
+
+        /// <summary>实际事件处理逻辑（从原 ProcessEventAsync 移入）</summary>
+        private async Task ProcessEventInternalAsync(EventData eventData)
         {
             _isProcessing = true;
             _lastEvent = eventData.Category.ToString();
@@ -552,7 +629,8 @@ namespace MochiBot.Src.Agent
                 MidTermMemoryCount = 0,
                 LongTermMemoryCount = 0,
                 IsProcessing = _isProcessing,
-                LastEvent = _lastEvent
+                LastEvent = _lastEvent,
+                State = _state
             };
         }
 
@@ -752,6 +830,14 @@ namespace MochiBot.Src.Agent
 
             _lastEvent = Active;
             ChangeMoodByEvent(Active);
+        }
+
+        // ========== 资源释放 ==========
+
+        public void Dispose()
+        {
+            _processLock.Dispose();
+            GC.SuppressFinalize(this);
         }
     }
 

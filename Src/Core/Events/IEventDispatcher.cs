@@ -86,5 +86,19 @@ namespace MochiBot.Src.Core.Events
 
         /// <summary>获得用户活动时间（由外部调用，如鼠标/键盘事件）</summary>
         TimeSpan RecordUserActivity();
+
+        // ========== 模块状态管理 ==========
+
+        /// <summary>注册模块初始状态</summary>
+        void RegisterModule(string moduleId, string initialState);
+
+        /// <summary>更新模块状态</summary>
+        void UpdateModuleState(string moduleId, string state);
+
+        /// <summary>获取模块当前状态</summary>
+        string GetModuleState(string moduleId);
+
+        /// <summary>获取所有模块状态</summary>
+        IReadOnlyDictionary<string, string> GetAllModuleStates();
     }
 }
