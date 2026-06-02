@@ -13,17 +13,39 @@ dotnet test --filter "FullyQualifiedName~TestClassName"  # 运行指定测试类
 
 PowerShell 环境下 `&&` 不可用，用 `;` 分隔命令。
 
+## CodeGraph 优先原则
+
+本项目已配置 CodeGraph MCP 服务器（`codegraph_*` 工具），它是一个基于 tree-sitter 解析的代码知识图谱，索引了所有符号、调用关系和文件结构。
+
+**查找代码时优先使用 CodeGraph，而非 grep/read：**
+
+| 任务 | 首选工具 |
+|---|---|
+| "X 定义在哪？" / 按名称查找符号 | `codegraph_search` |
+| "谁调用了 Y？" | `codegraph_callers` |
+| "Y 调用了谁？" | `codegraph_callees` |
+| "X 怎么流转到 Y？" | `codegraph_trace`（一次调用返回完整路径） |
+| "改 Z 会影响什么？" | `codegraph_impact` |
+| 查看签名/源码/文档 | `codegraph_node`（单个）/ `codegraph_explore`（多个） |
+| 针对某个任务获取上下文 | `codegraph_context`（首选，一次搞定） |
+| 查看目录下有哪些文件 | `codegraph_files` |
+
+**规则：**
+- 回答"X 怎么工作"类问题时，先 `codegraph_context`，再按需 `codegraph_explore` 看源码，**不要**启动子任务/agent 去逐文件读
+- 不要用 grep 去验证 codegraph 的结果——它来自 AST 解析，比文本搜索更准确
+- 不要对多个符号逐个调用 `codegraph_node`，用 `codegraph_explore` 一次获取
+- 如果 `.codegraph/` 目录不存在，提示用户运行 `codegraph init -i` 构建索引
+
 ## Architecture
 
 MochiBot 是一个 .NET 10.0 WPF 桌面桌宠应用，通过 LLM 驱动虚拟宠物进行情感交互。核心依赖：`Microsoft.Data.Sqlite` (SQLite) + `OpenAI` SDK v2.10.0。
 
 **事件驱动架构** — 所有交互（用户输入、系统定时事件、工具结果、情绪变化）都通过 `EventDispatcher` (Src/Core/Events/EventDispatcher.cs) 分发。事件分类定义在 `Src/EventModels/EventTypes.cs`（EventCategory 枚举）。`EventDispatcher` 同时承担 Cron 定时任务调度（每秒 tick 检查）。
 
-**Agent 是唯一大脑** — `MainAgent` (Src/Agent/Agent.cs) 订阅 `UserInput`、`SystemAuto`、`UiInteraction`、`ConfigChanged` 四类事件，统一处理所有逻辑。它自管理 `LlmClient`、`ShortTermMemory`、`LongMemory`，不依赖外部容器。Agent 本身不需要单元测试。
+Agent 本身不需要单元测试。
 
-**数据流**: 事件 → Agent.ProcessEventAsync() → 构建 System Prompt + User Context → LLM 对话模式 → 解析 JSON actions 数组 → ActionExecutor 分发执行 → 通过 ToolResult 事件回传 UI。
 
-**工具系统** — `ToolService` (Src/Services/Tools/ToolService.cs) 统一调度三层工具：基础工具（timer、reply、murmur、list_plugins）→ 心情动画工具（cry/dance/yawn/blush/stomp）→ DLLMOD 插件。LLM 通过 actions JSON 中的 `type` 字段区分：`tool_call` / `plugin_call` / `mcp_call` / `mood_change` / `midterm_memory` / `animation`。
+**工具系统** — `ToolService` (Src/Services/Tools/ToolService.cs) 统一调度三层工具：基础工具（timer、reply、list_plugins）→ 心情动画工具（cry/dance/yawn/blush/stomp）→ DLLMOD 插件。LLM 通过 actions JSON 中的 `type` 字段区分：`tool_call` / `plugin_call` / `mcp_call` / `mood_change` / `midterm_memory` / `animation`。
 
 **配置管理** — `ConfigReader` (Src/Core/Config/ConfigReader.cs) 是单例，统一管理 `Resources/appsettings.json` 和 `Resources/Personalities/*_person.json`。支持热重载：通过 `ConfigChanged` 事件通知 Agent 重建 LlmClient 和记忆模块。**所有配置必须走 ConfigReader，禁止硬编码；所有日志必须走 `ConfigReader.Instance.Logger`**。
 

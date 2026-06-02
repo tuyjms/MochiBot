@@ -6,7 +6,7 @@
 <title>VRM Viewer</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: transparent; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+  body { background: transparent; overflow: hidden; }
   canvas { display: block; }
   #status {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -22,49 +22,18 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
   #info {
-    display: none; /* 桌宠模式隐藏，调试时可改为 display:block */
+    display: none;
     position: absolute; top: 8px; left: 8px; color: #aaa; font-size: 11px;
     background: rgba(0,0,0,0.55); padding: 8px 10px; border-radius: 4px;
     pointer-events: none; z-index: 5; max-width: 300px; line-height: 1.6;
   }
-  #controls {
-    display: none; /* 桌宠模式隐藏，调试时可改为 display:flex */
-    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
-    gap: 8px; z-index: 5; flex-wrap: wrap; justify-content: center;
-  }
-  #controls button {
-    background: rgba(255,255,255,0.1); color: #ccc; border: 1px solid rgba(255,255,255,0.2);
-    padding: 6px 14px; border-radius: 16px; cursor: pointer; font-size: 12px;
-    transition: all 0.2s;
-  }
-  #controls button:hover { background: rgba(255,255,255,0.2); }
-  #controls button.on { background: rgba(100,180,255,0.3); border-color: rgba(100,180,255,0.6); color: #fff; }
-  #mood {
-    display: none; /* 桌宠模式隐藏 */
-    position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
-    color: #fff; font-size: 14px; pointer-events: none; z-index: 5;
-    background: rgba(0,0,0,0.5); padding: 4px 14px; border-radius: 12px;
-    transition: opacity 0.5s;
-  }
 </style>
 </head>
 <body>
-<div id="status"><div class="spinner"></div><div>Loading VRM model...</div></div>
+<div id="status"><div class="spinner"></div><div>Loading...</div></div>
 <div id="info"></div>
-<div id="mood"></div>
-<div id="controls">
-  <button id="btnIdle" class="on">Idle Bone</button>
-  <button id="btnBlink" class="on">Blink</button>
-  <button id="btnMood" class="on">Mood</button>
-  <button id="btnLook" class="on">Look</button>
-  <button id="btnBreath">Breath</button>
-  <button id="btnMotion">Motion</button>
-  <button id="btnMotionLoop" class="on">Loop</button>
-  <button id="btnReset">Reset</button>
-</div>
 
 <script>
-// 全局错误处理（模块加载前的错误也能捕获）
 var statusEl = document.getElementById('status');
 function showError(html) {
   statusEl.className = 'error';

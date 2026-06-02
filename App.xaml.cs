@@ -23,10 +23,6 @@ namespace MochiBot.Src.UI
             // 创建 MainWindow 并传入依赖
             var mainWindow = new MainWindow(Program.EventDispatcher, configReader, userConfigRepository);
             mainWindow.Show();
-
-            // 测试：自动打开 VRM 查看器窗口
-            var vrmViewer = new VrmViewerWindow(configReader);
-            vrmViewer.Show();
         }
 
         protected override void OnExit(ExitEventArgs e)

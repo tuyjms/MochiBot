@@ -68,6 +68,31 @@
                                      TextAlignment="Center" Padding="4,0"/>
                         </Grid>
 
+                        <!-- 关闭行为 -->
+                        <Label Content="关闭窗口行为" FontSize="13" FontWeight="SemiBold" Margin="0,6,0,2"/>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="120"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="关闭主窗口时" VerticalAlignment="Center" FontSize="13" Margin="0,0,8,0"/>
+                            <ComboBox Grid.Column="1" x:Name="closeBehaviorBox" Height="28" FontSize="13"/>
+                        </Grid>
+
+                        <!-- 鼠标穿透透明度 -->
+                        <Label Content="鼠标穿透" FontSize="13" FontWeight="SemiBold" Margin="0,6,0,2"/>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="40"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="穿透时窗口透明度" VerticalAlignment="Center" FontSize="13" Margin="0,0,8,0"/>
+                            <Slider Grid.Column="0" x:Name="passthroughOpacitySlider" Minimum="0.1" Maximum="1.0" Value="0.3"
+                                    TickFrequency="0.1" IsSnapToTickEnabled="True" Margin="120,0,50,0"/>
+                            <TextBlock Grid.Column="1" x:Name="passthroughOpacityValue" Text="0.3"
+                                       VerticalAlignment="Center" HorizontalAlignment="Right" FontSize="13"/>
+                        </Grid>
+
                         <!-- 日志设置 -->
                         <Label Content="日志" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,2"/>
                         <Grid Margin="0,0,0,6">
@@ -306,11 +331,20 @@
         </TabControl>
 
         <!-- 底部按钮 -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-            <Button Content="保存" Width="80" Height="32" FontSize="13"
-                    Click="SaveButton_Click" Margin="0,0,8,0"/>
-            <Button Content="取消" Width="80" Height="32" FontSize="13"
-                    Click="CancelButton_Click"/>
-        </StackPanel>
+        <Grid Grid.Row="1" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0" Content="退出桌宠" Width="80" Height="32" FontSize="13"
+                    HorizontalAlignment="Left" Foreground="#FFD32F2F"
+                    Click="ExitButton_Click"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="保存" Width="80" Height="32" FontSize="13"
+                        Click="SaveButton_Click" Margin="0,0,8,0"/>
+                <Button Content="取消" Width="80" Height="32" FontSize="13"
+                        Click="CancelButton_Click"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>

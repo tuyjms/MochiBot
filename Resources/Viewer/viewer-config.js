@@ -1,6 +1,5 @@
 // ============================================================
-// VRM Viewer 配置常量
-// 所有可调参数集中管理，修改此文件即可调整渲染/动画/交互行为
+// VRM Viewer 配置常量（最简版）
 // ============================================================
 
 // ---- 相机 ----
@@ -32,50 +31,17 @@ export const RENDERER = {
   CLEAR_ALPHA: 0,
 };
 
-// ---- Idle 骨骼动画 ----
-// 每个参数为 [振幅, 频率, 相位偏移]，对应 amp * sin(t * freq + phase)
-export const IDLE = {
-  HIPS:       { rotZ: [0.015, 0.7, 0],         rotX: [0.01,  1.1, 1],       rotY: [0.02, 0.5, 2] },
-  SPINE:      { rotZ: [0.012, 0.7, Math.PI],   rotX: [0.008, 1.3, 2] },
-  CHEST:      { rotX: [0.01,  1.4, 1] },
-  HEAD:       { rotX: [0.025, 0.6, 1.5],       rotY: [0.035, 0.4, 3],       rotZ: [0.02, 0.55, 0] },
-  UPPER_ARM:  { rotZ: [0.025, 0.5] },             // 右臂相位 +π
-  LOWER_ARM:  { rotZ: [0.015, 0.5, 0.3] },        // 右臂相位 +π
-  HAND:       { rotX: [0.02,  0.8, 1],            rotZ: [0.015, 0.6, 2] },    // 右手相位 +π
-  FINGERS:    { rotX: [0.03,  0.45] },             // 每指相位偏移 +0.7
-  EYE:        { rotY: [0.02,  1.2, 0],            rotX: [0.015, 0.9, 1] },
-  JAW:        { rotX: [0.005, 2.0, 3] },
-};
-
-// ---- 眨眼 ----
-export const BLINK = {
-  CLOSE_MS: 50,
-  HOLD_MS: 50,
-  OPEN_MS: 50,
-  MIN_INTERVAL_MS: 2000,
-  MAX_INTERVAL_MS: 7000,
-};
-
-// ---- 呼吸 ----
-export const BREATH = {
-  SCALE_Y: 0.008,
-  SCALE_X: 0.004,
-  SPEED: 1.5,
-};
-
-// ---- 情绪 ----
-export const MOOD = {
-  CYCLE_SEC: 5,
-  EXPRESSION_INTENSITY: 0.8,
-};
-
-// ---- 视线追踪 ----
-export const LOOK = {
-  CYCLE_SEC: 8,
-  HORIZONTAL: 0.4,
-  VERTICAL: 0.3,
-};
-
 // ---- 表情映射 ----
-export const MOODS = ['neutral', 'happy', 'angry', 'sad', 'relaxed'];
-export const MOOD_MAP = { happy: 'happy', sad: 'sad', angry: 'angry', neutral: 'neutral' };
+export const MOOD_MAP = {
+  happy: 'happy', sad: 'sad', angry: 'angry', neutral: 'neutral',
+  relaxed: 'relaxed', surprised: 'surprised',
+  sleepy: 'relaxed', touched: 'happy', teasing: 'happy',
+};
+
+// ---- Agent 状态 → VRM 效果 ----
+export const STATE_EFFECTS = {
+  thinking:  { expression: 'relaxed', lookX: 0, lookY: -0.3 },
+  error:     { expression: 'surprised', lookX: 0, lookY: 0 },
+  reloading: { reset: true },
+  idle:      { reset: true },
+};

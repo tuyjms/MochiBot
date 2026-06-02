@@ -50,6 +50,7 @@ namespace MochiBot.Src.UI
 
             // 在 InitializeComponent 之后绑定事件，避免 XAML 加载时触发
             opacitySlider.ValueChanged += OpacitySlider_ValueChanged;
+            passthroughOpacitySlider.ValueChanged += PassthroughOpacitySlider_ValueChanged;
             _subPersonalities.CollectionChanged += (_, _) => UpdateWeightSum();
 
             LoadCurrentSettings();
@@ -100,6 +101,14 @@ namespace MochiBot.Src.UI
             midTermMemoryOnChatCheck.IsChecked = appSettings.EnableMidTermMemoryOnChat;
             longTermRecallCheck.IsChecked = appSettings.EnableLongTermRecall;
             maxActionsBox.Text = appSettings.MaxActionsPerResponse.ToString();
+
+            // 关闭行为
+            closeBehaviorBox.ItemsSource = AppSettings.ValidCloseBehaviors;
+            closeBehaviorBox.SelectedItem = appSettings.CloseBehavior;
+
+            // 穿透透明度
+            passthroughOpacitySlider.Value = appSettings.PassthroughOpacity;
+            UpdatePassthroughOpacityValue();
 
             // 日志
             logLevelBox.ItemsSource = AppSettings.ValidLogLevels;
@@ -475,6 +484,16 @@ namespace MochiBot.Src.UI
             UpdateOpacityValue();
         }
 
+        private void UpdatePassthroughOpacityValue()
+        {
+            passthroughOpacityValue.Text = $"{passthroughOpacitySlider.Value:F1}";
+        }
+
+        private void PassthroughOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            UpdatePassthroughOpacityValue();
+        }
+
         // ==================== 保存 ====================
 
         private async void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -534,6 +553,9 @@ namespace MochiBot.Src.UI
                     ?? new AppSettings().LogToFile;
                 appSettings.LogToConsole = logToConsoleCheck.IsChecked
                     ?? new AppSettings().LogToConsole;
+                appSettings.CloseBehavior = closeBehaviorBox.SelectedItem?.ToString()
+                    ?? new AppSettings().CloseBehavior;
+                appSettings.PassthroughOpacity = passthroughOpacitySlider.Value;
                 _configReader.SaveAppSettings(appSettings);
 
                 // ====== 2. 保存数据库配置 ======
@@ -605,6 +627,16 @@ namespace MochiBot.Src.UI
             }).ToList();
 
             _configReader.SavePersonality(_currentPersonalityName, config);
+        }
+
+        private void ExitButton_Click(object sender, RoutedEventArgs e)
+        {
+            var confirm = MessageBox.Show("确定要退出桌宠吗？", "确认退出",
+                MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (confirm != MessageBoxResult.Yes) return;
+
+            _configReader.Logger.Info("[Settings] 用户主动退出桌宠");
+            Application.Current.Shutdown();
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)

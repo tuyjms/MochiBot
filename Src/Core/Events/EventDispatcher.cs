@@ -421,6 +421,18 @@ namespace MochiBot.Src.Core.Events
         public void UpdateModuleState(string moduleId, string state)
         {
             _moduleStates[moduleId] = state;
+
+            // 发布模块状态变更事件，供 UI 层（如 VRM Viewer）订阅
+            Publish(new EventData
+            {
+                Category = EventCategory.ModuleState,
+                Trigger = EventTrigger.System,
+                Info = JsonSerializer.Serialize(new
+                {
+                    moduleId,
+                    state
+                })
+            });
         }
 
         public string GetModuleState(string moduleId)

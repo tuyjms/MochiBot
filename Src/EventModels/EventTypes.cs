@@ -31,7 +31,10 @@ namespace MochiBot.Src.EventModels
         ConfigUpdate,
 
         /// <summary>配置已变更事件（ConfigReader → 各模块，触发热重载）</summary>
-        ConfigChanged
+        ConfigChanged,
+
+        /// <summary>模块状态变更事件（Agent 状态机切换时发布）</summary>
+        ModuleState
     }
 
     /// <summary>

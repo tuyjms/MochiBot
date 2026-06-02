@@ -1,17 +1,24 @@
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
 using MochiBot.Src.Core.Config;
+using MochiBot.Src.Core.Events;
+using MochiBot.Src.EventModels;
 
 namespace MochiBot.Src.UI
 {
     public partial class VrmViewerWindow : Window
     {
         private readonly IConfigReader _configReader;
+        private readonly IEventDispatcher? _eventDispatcher;
+        private readonly List<string> _subscriptionIds = new();
+        private bool _webViewReady;
 
-        public VrmViewerWindow(IConfigReader configReader)
+        public VrmViewerWindow(IConfigReader configReader, IEventDispatcher? eventDispatcher = null)
         {
             _configReader = configReader;
+            _eventDispatcher = eventDispatcher;
             InitializeComponent();
             Loaded += OnLoaded;
             DebugLog("Constructor done, Loaded subscribed");
@@ -74,28 +81,30 @@ namespace MochiBot.Src.UI
                 var modelFileName = "QQ vrm 1.vrm";
                 var encodedModelPath = Uri.EscapeDataString($"Data/{modelFileName}");
 
-                // Check for .vrma motion files and pass the most recent one
-                var dataDir = Path.Combine(resourcesPath, "Data");
-                var motionParam = "";
-                if (Directory.Exists(dataDir))
-                {
-                    var vrmaFiles = Directory.GetFiles(dataDir, "*.vrma");
-                    if (vrmaFiles.Length > 0)
-                    {
-                        // Use the most recently modified .vrma file
-                        var latest = vrmaFiles.OrderByDescending(f => File.GetLastWriteTime(f)).First();
-                        var motionFileName = Path.GetFileName(latest);
-                        var encodedMotionPath = Uri.EscapeDataString($"Data/{motionFileName}");
-                        motionParam = $"&motion={encodedMotionPath}";
-                    }
-                }
-
-                var viewerUrl = $"https://vrm.local/Viewer/vrm-viewer.html?model={encodedModelPath}{motionParam}&t={DateTime.Now.Ticks}";
+                var viewerUrl = $"https://vrm.local/Viewer/vrm-viewer.html?model={encodedModelPath}&t={DateTime.Now.Ticks}";
 
                 DebugLog($"Navigating to: {viewerUrl}");
                 webView.CoreWebView2.Navigate(viewerUrl);
                 _configReader.Logger.Info("[VRMViewer] Navigation started");
                 DebugLog("Navigation command issued");
+
+                // 监听 JS 端 postMessage（模型加载完成时 JS 会发送 ready 消息）
+                webView.CoreWebView2.WebMessageReceived += (s, args) =>
+                {
+                    try
+                    {
+                        var json = args.WebMessageAsJson;
+                        using var doc = JsonDocument.Parse(json);
+                        if (doc.RootElement.TryGetProperty("type", out var typeProp) &&
+                            typeProp.GetString() == "ready")
+                        {
+                            _webViewReady = true;
+                            DebugLog("VRM model ready, subscribing to events");
+                            SubscribeToEvents();
+                        }
+                    }
+                    catch { }
+                };
             }
             catch (Exception ex)
             {
@@ -126,6 +135,87 @@ namespace MochiBot.Src.UI
             return resourcesPath;
         }
 
+        /// <summary>订阅心情变化和模块状态事件</summary>
+        private void SubscribeToEvents()
+        {
+            if (_eventDispatcher == null) return;
+
+            // 订阅心情变化事件
+            var moodSubId = _eventDispatcher.Subscribe(EventCategory.MoodChange, OnMoodChange);
+            _subscriptionIds.Add(moodSubId);
+
+            // 订阅模块状态变更事件
+            var stateSubId = _eventDispatcher.Subscribe(EventCategory.ModuleState, OnModuleStateChanged);
+            _subscriptionIds.Add(stateSubId);
+
+            _configReader.Logger.Info("[VRMViewer] 已订阅 MoodChange 和 ModuleState 事件");
+        }
+
+        /// <summary>心情变化 → VRM 表情</summary>
+        private void OnMoodChange(EventData eventData)
+        {
+            if (!_webViewReady) return;
+            try
+            {
+                using var doc = JsonDocument.Parse(eventData.Info);
+                var root = doc.RootElement;
+
+                // 有 animation 字段时跳过（由 2D 渲染器处理）
+                if (root.TryGetProperty("animation", out _)) return;
+
+                if (root.TryGetProperty("mood", out var moodProp))
+                {
+                    var mood = moodProp.GetString()?.ToLower();
+                    if (!string.IsNullOrEmpty(mood))
+                    {
+                        SendToViewer(new { type = "mood", expression = mood });
+                    }
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>Agent 状态变化 → VRM 表情/视线</summary>
+        private void OnModuleStateChanged(EventData eventData)
+        {
+            if (!_webViewReady) return;
+            try
+            {
+                using var doc = JsonDocument.Parse(eventData.Info);
+                var root = doc.RootElement;
+
+                // 只处理 agent 模块的状态变更
+                var moduleId = root.TryGetProperty("moduleId", out var idProp) ? idProp.GetString() : null;
+                if (moduleId != "agent") return;
+
+                var state = root.TryGetProperty("state", out var stateProp) ? stateProp.GetString() : null;
+                if (!string.IsNullOrEmpty(state))
+                {
+                    SendToViewer(new { type = "state", state });
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>向 WebView2 JS 端发送 JSON 消息</summary>
+        private void SendToViewer(object message)
+        {
+            try
+            {
+                var json = JsonSerializer.Serialize(message);
+                DebugLog($"SendToViewer: {json}");
+                Dispatcher.Invoke(() =>
+                {
+                    if (webView.CoreWebView2 != null)
+                        webView.CoreWebView2.PostWebMessageAsJson(json);
+                });
+            }
+            catch (Exception ex)
+            {
+                DebugLog($"SendToViewer error: {ex.Message}");
+            }
+        }
+
         private static void DebugLog(string msg)
         {
             try
@@ -138,6 +228,14 @@ namespace MochiBot.Src.UI
 
         protected override void OnClosed(EventArgs e)
         {
+            // 取消事件订阅
+            if (_eventDispatcher != null)
+            {
+                foreach (var subId in _subscriptionIds)
+                    _eventDispatcher.Unsubscribe(subId);
+                _subscriptionIds.Clear();
+            }
+
             _configReader.Logger.Info("[VRMViewer] Window closed");
             webView.Dispose();
             base.OnClosed(e);
