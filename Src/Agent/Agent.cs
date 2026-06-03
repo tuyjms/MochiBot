@@ -50,6 +50,10 @@ namespace MochiBot.Src.Agent
         // ========== 用户活动跟踪（用于用眼提醒/空闲检测条件判断） ==========
         private DateTime _lastActivityTime = DateTime.Now;
 
+        // ========== 长期记忆维护 ==========
+        private Timer? _maintenanceTimer;
+        private int _longMemoryCount = 0;
+
         // ========== 事件队列 + 状态机 ==========
         private readonly ConcurrentQueue<EventData> _eventQueue = new();
         private const int MaxQueueSize = 20;
@@ -86,6 +90,8 @@ namespace MochiBot.Src.Agent
 
         // 对话模式用户上下文模板
         private const string UserContextTemplate = @"
+【长期记忆】{LongTermMemory}
+
 【短期记忆】{ShortTermMemory}
 
 用户说：{UserMessage}
@@ -154,6 +160,14 @@ namespace MochiBot.Src.Agent
 
             // 注册模块状态
             _eventDispatcher.RegisterModule("agent", AgentState.Idle.ToString().ToLower());
+
+            // 启动长期记忆维护定时器
+            var promotionInterval = _configReader.GetModuleSettings().LongTermMemory_PromotionInterval;
+            _maintenanceTimer = new Timer(async _ => await RunMemoryMaintenanceAsync(),
+                null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(promotionInterval));
+
+            // 初始化长期记忆计数
+            _ = InitializeLongMemoryCountAsync();
         }
 
         /// <summary>订阅事件调度器的事件</summary>
@@ -604,6 +618,11 @@ namespace MochiBot.Src.Agent
             // 检查是否需要触发短期记忆总结
             if (_shortTermMemory.IsSummarizePending)
             {
+                // 先触发长期记忆录入（在短期记忆被压缩前）
+                await _longMemory.SummarizeShortTermAsync(_shortTermMemory);
+                // 更新长期记忆计数
+                _longMemoryCount = await _longMemory.GetCountAsync();
+                // 再压缩短期记忆
                 await _shortTermMemory.SummarizeAsync();
             }
 
@@ -676,6 +695,37 @@ namespace MochiBot.Src.Agent
             return DefaultEventFallback;
         }
 
+        // ========== 长期记忆维护 ==========
+
+        /// <summary>定期维护长期记忆（晋升高频访问记忆、淘汰低重要度长期未访问记忆）</summary>
+        private async Task RunMemoryMaintenanceAsync()
+        {
+            try
+            {
+                var ms = _configReader.GetModuleSettings();
+                await _longMemory.PromoteEntriesAsync(ms.LongTermMemory_PromotionThreshold, 10);
+                await _longMemory.EvictEntriesAsync(0, 30);
+                _longMemoryCount = await _longMemory.GetCountAsync();
+            }
+            catch (Exception ex)
+            {
+                _configReader.Logger.Warn($"[Agent] 记忆维护失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>初始化长期记忆计数</summary>
+        private async Task InitializeLongMemoryCountAsync()
+        {
+            try
+            {
+                _longMemoryCount = await _longMemory.GetCountAsync();
+            }
+            catch (Exception ex)
+            {
+                _configReader.Logger.Warn($"[Agent] 初始化长期记忆计数失败: {ex.Message}");
+            }
+        }
+
         // ========== 状态查询 ==========
 
         public AgentStatus GetStatus()
@@ -685,7 +735,7 @@ namespace MochiBot.Src.Agent
                 CurrentMood = _currentMood.ToString(),
                 ShortTermMemoryCount = _shortTermMemory.Count,
                 MidTermMemoryCount = 0,
-                LongTermMemoryCount = 0,
+                LongTermMemoryCount = _longMemoryCount,
                 IsProcessing = _isProcessing,
                 LastEvent = _lastEvent,
                 State = _state
@@ -731,14 +781,18 @@ namespace MochiBot.Src.Agent
         }
 
         /// <summary>构建用户上下文（含短期记忆）</summary>
-        private Task<string> BuildUserContextAsync(string userMessage)
+        private async Task<string> BuildUserContextAsync(string userMessage)
         {
+            // 长期记忆检索
+            var longTermStr = await RetrieveLongTermMemoryAsync(userMessage);
+
             // 短期记忆
             var recentMessages = _shortTermMemory.GetRecentMessages(10);
             var shortTermStr = string.Join("\n", recentMessages.Select(m => $"[{m.Role}] {m.Content}"));
 
             var result = _userContextFormatter.Format(new Dictionary<string, string>
             {
+                { "LongTermMemory", longTermStr },
                 { "ShortTermMemory", shortTermStr },
                 { "UserMessage", userMessage }
             });
@@ -749,7 +803,74 @@ namespace MochiBot.Src.Agent
                 result += $"\n\n{_lastJsonError}";
             }
 
-            return Task.FromResult(result);
+            return result;
+        }
+
+        /// <summary>从用户消息中提取关键词并检索长期记忆</summary>
+        private async Task<string> RetrieveLongTermMemoryAsync(string userMessage)
+        {
+            try
+            {
+                var keywords = ExtractKeywords(userMessage);
+                if (keywords.Count == 0)
+                    return "（无）";
+
+                var allResults = new List<LongMemoryEntry>();
+                foreach (var keyword in keywords)
+                {
+                    var results = await _longMemory.SearchByKeywordsAsync(keyword);
+                    allResults.AddRange(results);
+                }
+
+                // 去重（按 Id）
+                var distinctResults = allResults
+                    .GroupBy(e => e.Id)
+                    .Select(g => g.First())
+                    .OrderByDescending(e => e.Importance)
+                    .Take(5)
+                    .ToList();
+
+                if (distinctResults.Count == 0)
+                    return "（无）";
+
+                // 更新访问计数
+                foreach (var entry in distinctResults)
+                {
+                    await _longMemory.UpdateAccessAsync(entry.Id);
+                }
+
+                _configReader.Logger.Info($"[Agent] 检索到 {distinctResults.Count} 条长期记忆");
+
+                return string.Join("\n", distinctResults.Select(e =>
+                    $"[{e.EventTimestamp:yyyy-MM-dd}] {e.Description}"));
+            }
+            catch (Exception ex)
+            {
+                _configReader.Logger.Warn($"[Agent] 长期记忆检索失败: {ex.Message}");
+                return "（无）";
+            }
+        }
+
+        /// <summary>简单关键词提取（按标点/空格分词，取前3个长度>=2的非停用词）</summary>
+        private static List<string> ExtractKeywords(string text, int maxKeywords = 3)
+        {
+            var stopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "的", "了", "是", "在", "我", "你", "他", "她", "它",
+                "这", "那", "有", "和", "与", "对", "把", "被", "让",
+                "吗", "呢", "吧", "啊", "哦", "嗯", "好", "不", "没",
+                "a", "an", "the", "is", "are", "was", "were", "i", "you",
+                "he", "she", "it", "we", "they", "this", "that", "and", "or"
+            };
+
+            var words = text.Split(
+                new[] { ' ', ',', '.', '!', '?', '。', '！', '？', '，', '、', '；', '：', '\n', '\r' },
+                StringSplitOptions.RemoveEmptyEntries);
+
+            return words
+                .Where(w => w.Length >= 2 && !stopWords.Contains(w))
+                .Take(maxKeywords)
+                .ToList();
         }
 
         /// <summary>从模型名中提取提供商（格式："{提供商}/{模型名}"）</summary>
@@ -894,6 +1015,7 @@ namespace MochiBot.Src.Agent
 
         public void Dispose()
         {
+            _maintenanceTimer?.Dispose();
             _processLock.Dispose();
             GC.SuppressFinalize(this);
         }
