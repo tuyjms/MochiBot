@@ -31,7 +31,7 @@ PowerShell 环境下 `&&` 不可用，用 `;` 分隔命令。
 | 查看目录下有哪些文件 | `codegraph_files` |
 
 **规则：**
-- **探索代码时必须优先使用 CodeGraph**——无论是查找符号、理解调用关系、追踪数据流还是分析影响范围，都先用 `codegraph_*` 工具，**禁止**先用 Grep/Read/Agent 做文件扫描再人工拼凑
+- **探索代码和查看功能实现时必须优先使用 CodeGraph**——无论是查找符号、理解调用关系、追踪数据流、查找功能实现还是分析影响范围，都先用 `codegraph_*` 工具，**禁止**先用 Grep/Read/Agent 做文件扫描再人工拼凑
 - 回答"X 怎么工作"类问题时，先 `codegraph_context`，再按需 `codegraph_explore` 看源码，**不要**启动子任务/agent 去逐文件读
 - 不要用 grep 去验证 codegraph 的结果——它来自 AST 解析，比文本搜索更准确
 - 不要对多个符号逐个调用 `codegraph_node`，用 `codegraph_explore` 一次获取

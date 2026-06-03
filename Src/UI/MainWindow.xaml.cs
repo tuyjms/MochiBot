@@ -26,6 +26,7 @@ namespace MochiBot.Src.UI
         private readonly IConfigReader _configReader;
         private readonly UserConfigRepository? _userConfigRepository;
         private ChatWindow? _chatWindow;
+        private Window? _settingsWindow;
         private TrayIcon? _trayIcon;
         private string? _latestAgentMessage;
 
@@ -34,6 +35,7 @@ namespace MochiBot.Src.UI
         private CharacterRenderer? _renderer;
         private DispatcherTimer? _timer;
         private DispatcherTimer? _toolbarHideTimer;
+        private DispatcherTimer? _bubbleHideTimer;
         private string? _moodSubscriptionId;
 
         // VRM 模式
@@ -144,6 +146,21 @@ namespace MochiBot.Src.UI
             {
                 toolbarPanel.Visibility = Visibility.Collapsed;
                 _toolbarHideTimer.Stop();
+            };
+
+            // 气泡自动消失定时器
+            _bubbleHideTimer = new DispatcherTimer();
+            _bubbleHideTimer.Tick += (_, _) =>
+            {
+                _bubbleHideTimer.Stop();
+                // 淡出动画：Opacity 1→0，300ms，完成后隐藏
+                var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(300));
+                fadeOut.Completed += (_, _) =>
+                {
+                    chatBubble.Visibility = Visibility.Collapsed;
+                    chatBubble.Opacity = 1; // 重置，下次显示不受影响
+                };
+                chatBubble.BeginAnimation(UIElement.OpacityProperty, fadeOut);
             };
 
             SubscribeToGifMoodEvents();
@@ -415,19 +432,40 @@ namespace MochiBot.Src.UI
             Dispatcher.Invoke(() =>
             {
                 bubbleAvatarText.Text = string.IsNullOrEmpty(avatarChar) ? _avatarChar : avatarChar;
-                var displayText = text.Length > 50 ? text[..50] + "..." : text;
-                bubbleText.Text = displayText;
+                bubbleText.Text = text;
+
+                // 重置动画状态（如果正在淡出中）
+                chatBubble.BeginAnimation(UIElement.OpacityProperty, null);
+                chatBubble.Opacity = 1;
                 chatBubble.Visibility = Visibility.Visible;
+
+                // 气泡自动消失：2s 基础 + 每 50 字 1s，上限 8s
+                var durationSec = Math.Min(2 + text.Length / 50, 8);
+                _bubbleHideTimer?.Stop();
+                if (_bubbleHideTimer != null)
+                {
+                    _bubbleHideTimer.Interval = TimeSpan.FromSeconds(durationSec);
+                    _bubbleHideTimer.Start();
+                }
             });
         }
 
         public void HideBubble()
         {
-            Dispatcher.Invoke(() => chatBubble.Visibility = Visibility.Collapsed);
+            Dispatcher.Invoke(() =>
+            {
+                _bubbleHideTimer?.Stop();
+                chatBubble.BeginAnimation(UIElement.OpacityProperty, null);
+                chatBubble.Opacity = 1;
+                chatBubble.Visibility = Visibility.Collapsed;
+            });
         }
 
         private void Bubble_Click(object sender, MouseButtonEventArgs e)
         {
+            _bubbleHideTimer?.Stop();
+            chatBubble.BeginAnimation(UIElement.OpacityProperty, null);
+            chatBubble.Opacity = 1;
             chatBubble.Visibility = Visibility.Collapsed;
             ToggleChatButton_Click(this, new RoutedEventArgs());
         }
@@ -508,10 +546,21 @@ namespace MochiBot.Src.UI
         {
             if (_passthroughWindow != null) return;
 
+            var pinPath = new System.Windows.Shapes.Path
+            {
+                Data = System.Windows.Media.Geometry.Parse(
+                    "M16,12V4h1V2H7v2h1v8l-2,2v2h5.2v6h1.6v-6H18v-2L16,12z"),
+                Fill = new System.Windows.Media.SolidColorBrush(
+                        (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#FF333333")),
+                Width = 18,
+                Height = 18,
+                Stretch = System.Windows.Media.Stretch.Uniform,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                VerticalAlignment = System.Windows.VerticalAlignment.Center
+            };
             var btn = new System.Windows.Controls.Button
             {
-                Content = "📌",
-                FontSize = 14,
+                Content = pinPath,
                 Width = 36,
                 Height = 36,
                 Background = System.Windows.Media.Brushes.White,
@@ -562,6 +611,20 @@ namespace MochiBot.Src.UI
                 if (!_isDragging)
                     TogglePassthrough();
                 e.Handled = true;
+            };
+
+            // 悬停变色
+            btn.MouseEnter += (_, _) =>
+            {
+                if (btn.Content is System.Windows.Shapes.Path p)
+                    p.Fill = new System.Windows.Media.SolidColorBrush(
+                        (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#FF6B5CE7"));
+            };
+            btn.MouseLeave += (_, _) =>
+            {
+                if (btn.Content is System.Windows.Shapes.Path p)
+                    p.Fill = new System.Windows.Media.SolidColorBrush(
+                        (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#FF333333"));
             };
 
             _passthroughWindow = new Window
@@ -662,6 +725,22 @@ namespace MochiBot.Src.UI
             _toolbarHideTimer?.Start();
         }
 
+        // ========== 图标按钮悬停效果 ==========
+
+        private void IconBtn_MouseEnter(object sender, MouseEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Button btn && btn.Content is System.Windows.Shapes.Path path)
+                path.Fill = new System.Windows.Media.SolidColorBrush(
+                    (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#FF6B5CE7"));
+        }
+
+        private void IconBtn_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (sender is System.Windows.Controls.Button btn && btn.Content is System.Windows.Shapes.Path path)
+                path.Fill = new System.Windows.Media.SolidColorBrush(
+                    (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#FF333333"));
+        }
+
         private void ToggleChatButton_Click(object sender, RoutedEventArgs e)
         {
             if (_chatWindow == null) return;
@@ -680,8 +759,15 @@ namespace MochiBot.Src.UI
 
         private void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            var settingsWindow = new SettingsWindow(_configReader, _eventDispatcher, this, _userConfigRepository);
-            settingsWindow.ShowDialog();
+            if (_settingsWindow != null)
+            {
+                _settingsWindow.Activate();
+                return;
+            }
+            _settingsWindow = new SettingsWindow(_configReader, _eventDispatcher, this, _userConfigRepository);
+            _settingsWindow.Owner = this;
+            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+            _settingsWindow.Show();
         }
 
         // ========== 窗口关闭 ==========

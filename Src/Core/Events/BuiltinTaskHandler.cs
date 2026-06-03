@@ -14,15 +14,9 @@ namespace MochiBot.Src.Core.Events
         private readonly IEventDispatcher _eventDispatcher;
         private readonly List<string> _subscriptionIds = new();
 
-        // 用眼提醒
-        private DateTime _lastActivityTime = DateTime.Now;
-        private bool _eyeRestFired;
-
-        // 深夜关怀
+        // 深夜关怀（随机偏移计算）
         private TimeSpan? _todayLateNightTime;
         private int _lastLateNightCheckDay;
-
-        // 随机数生成器
         private readonly Random _random = new();
 
         public BuiltinTaskHandler(IEventDispatcher eventDispatcher)
@@ -76,118 +70,42 @@ namespace MochiBot.Src.Core.Events
 
         /// <summary>
         /// 碎碎念处理
-        /// 从任务参数读取权重，随机触发
+        /// 权重判断已移至 Agent.TryHandleMurmur，此处不再二次发布事件
         /// </summary>
         private void HandleMurmur(EventData eventData)
         {
-            // 从事件信息中解析权重
-            int weight = 30;
-            try
-            {
-                using var doc = JsonDocument.Parse(eventData.Info);
-                if (doc.RootElement.TryGetProperty("parameters", out var paramsProp))
-                {
-                    int.TryParse(paramsProp.GetString(), out weight);
-                }
-            }
-            catch { }
-
-            var roll = _random.Next(100);
-            if (roll < weight)
-            {
-                _eventDispatcher.Publish(new EventData
-                {
-                    Category = EventCategory.SystemAuto,
-                    Trigger = EventTrigger.System,
-                    Info = JsonSerializer.Serialize(new { type = BuiltinTasks.Murmur, name = BuiltinTasks.NameMurmur })
-                });
-            }
+            // 权重判断和 LLM/内置文本选择已由 Agent.TryHandleMurmur 统一处理
+            // 此处无需额外操作，避免重复触发 LLM 请求
         }
 
         /// <summary>
         /// 用眼提醒处理
-        /// 从任务参数读取阈值，检查用户活动时间
+        /// 条件检查已移至 Agent.ProcessEventInternalAsync，此处不再二次发布事件
         /// </summary>
         private void HandleEyeRest(EventData eventData)
         {
-            if (_eyeRestFired) return;
-
-            // 从事件信息中解析阈值
-            int thresholdMinutes = 120;
-            try
-            {
-                using var doc = JsonDocument.Parse(eventData.Info);
-                if (doc.RootElement.TryGetProperty("parameters", out var paramsProp))
-                {
-                    int.TryParse(paramsProp.GetString(), out thresholdMinutes);
-                }
-            }
-            catch { }
-
-            var elapsed = DateTime.Now - _lastActivityTime;
-            if (elapsed.TotalMinutes >= thresholdMinutes)
-            {
-                _eyeRestFired = true;
-                var hours = (int)elapsed.TotalHours;
-                _eventDispatcher.Publish(new EventData
-                {
-                    Category = EventCategory.SystemAuto,
-                    Trigger = EventTrigger.System,
-                    Info = JsonSerializer.Serialize(new { type = BuiltinTasks.EyeRest, hours, name = BuiltinTasks.NameEyeRest })
-                });
-            }
+            // 用眼提醒的条件判断（阈值检查）已由 Agent 直接处理
+            // 此处无需额外操作，避免重复触发 LLM 请求
         }
 
         /// <summary>
         /// 深夜关怀处理
-        /// 从任务参数读取偏移范围，计算今日触发时间
+        /// 条件检查已移至 Agent.ProcessEventInternalAsync，此处不再二次发布事件
         /// </summary>
         private void HandleLateNight(EventData eventData)
         {
-            var now = DateTime.Now;
-            var todayLateNight = GetTodayLateNightTime(eventData);
-            var currentTime = now.TimeOfDay;
-            var diff = (currentTime - todayLateNight).TotalSeconds;
-
-            if (diff >= 0 && diff < 2)
-            {
-                _eventDispatcher.Publish(new EventData
-                {
-                    Category = EventCategory.SystemAuto,
-                    Trigger = EventTrigger.System,
-                    Info = JsonSerializer.Serialize(new { type = BuiltinTasks.LateNight, name = BuiltinTasks.NameLateNight })
-                });
-            }
+            // 深夜关怀的时间判断已由 Agent 直接处理
+            // 此处无需额外操作，避免重复触发 LLM 请求
         }
 
         /// <summary>
         /// 空闲检测处理
-        /// 从任务参数读取阈值，检查用户空闲时间
+        /// 条件检查已移至 Agent.ProcessEventInternalAsync，此处不再二次发布事件
         /// </summary>
         private void HandleIdleCheck(EventData eventData)
         {
-            // 从事件信息中解析阈值
-            int thresholdMinutes = 5;
-            try
-            {
-                using var doc = JsonDocument.Parse(eventData.Info);
-                if (doc.RootElement.TryGetProperty("parameters", out var paramsProp))
-                {
-                    int.TryParse(paramsProp.GetString(), out thresholdMinutes);
-                }
-            }
-            catch { }
-
-            var idleMinutes = (DateTime.Now - _lastActivityTime).TotalMinutes;
-            if (idleMinutes >= thresholdMinutes)
-            {
-                _eventDispatcher.Publish(new EventData
-                {
-                    Category = EventCategory.SystemAuto,
-                    Trigger = EventTrigger.System,
-                    Info = JsonSerializer.Serialize(new { type = BuiltinTasks.Idle, minutes = (int)idleMinutes, name = BuiltinTasks.NameIdleCheck })
-                });
-            }
+            // 空闲检测的条件判断（阈值检查）已由 Agent 直接处理
+            // 此处无需额外操作，避免重复触发 LLM 请求
         }
 
         /// <summary>
@@ -239,15 +157,6 @@ namespace MochiBot.Src.Core.Events
             var totalMinutes = baseMinutes + offset;
             totalMinutes = (totalMinutes % 1440 + 1440) % 1440;
             return TimeSpan.FromMinutes(totalMinutes);
-        }
-
-        /// <summary>
-        /// 记录用户活动时间
-        /// </summary>
-        public void RecordUserActivity()
-        {
-            _lastActivityTime = DateTime.Now;
-            _eyeRestFired = false;
         }
 
         public void Dispose()

@@ -47,6 +47,9 @@ namespace MochiBot.Src.Agent
         private string _lastEvent = string.Empty;
         private string _lastJsonError = string.Empty;
 
+        // ========== 用户活动跟踪（用于用眼提醒/空闲检测条件判断） ==========
+        private DateTime _lastActivityTime = DateTime.Now;
+
         // ========== 事件队列 + 状态机 ==========
         private readonly ConcurrentQueue<EventData> _eventQueue = new();
         private const int MaxQueueSize = 20;
@@ -59,6 +62,7 @@ namespace MochiBot.Src.Agent
         private const string MurmurPrompt = "你现在想对用户说一句碎碎念/撒娇的话，表达你的思念或关心。";
         private const string EyeRestPrompt = "用户已经盯着屏幕很久了，提醒他休息一下眼睛。";
         private const string LateNightPrompt = "已经很晚了，关心用户为什么还没睡，温柔地催他睡觉。";
+        private const string IdleCheckPrompt = "用户已经离开一段时间了，说一句想念的话或者自言自语。";
         private const string DefaultEventFallback = "请根据事件生成合适的回复。";
 
         // 短期记忆中的系统消息标签
@@ -427,8 +431,18 @@ namespace MochiBot.Src.Agent
 
             try
             {
+                // 用户输入时记录活动时间
+                if (eventData.Category == EventCategory.UserInput)
+                {
+                    _lastActivityTime = DateTime.Now;
+                }
+
                 // 检查是否为碎碎念事件，根据权重决定使用内置文本还是 LLM
                 if (eventData.Category == EventCategory.SystemAuto && TryHandleMurmur(eventData))
+                    return;
+
+                // 系统自动事件：条件检查，不满足则跳过（避免无效 LLM 调用）
+                if (eventData.Category == EventCategory.SystemAuto && !ShouldProcessEvent(eventData))
                     return;
 
                 string userMessage;
@@ -528,6 +542,49 @@ namespace MochiBot.Src.Agent
             }
         }
 
+        /// <summary>
+        /// 系统自动事件条件检查
+        /// 检查用眼提醒和空闲检测的前置条件，不满足则跳过 LLM 调用
+        /// </summary>
+        private bool ShouldProcessEvent(EventData eventData)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(eventData.Info);
+                if (!doc.RootElement.TryGetProperty("type", out var typeProp))
+                    return true;
+
+                var type = typeProp.GetString();
+
+                // 用眼提醒：检查是否达到阈值（默认 120 分钟）
+                if (type == BuiltinTasks.EyeRest)
+                {
+                    int threshold = 120;
+                    if (doc.RootElement.TryGetProperty("parameters", out var p) && int.TryParse(p.GetString(), out var t))
+                        threshold = t;
+
+                    var elapsed = (DateTime.Now - _lastActivityTime).TotalMinutes;
+                    if (elapsed < threshold)
+                        return false;
+                }
+
+                // 空闲检测：检查是否达到阈值（默认 5 分钟）
+                if (type == BuiltinTasks.IdleCheck)
+                {
+                    int threshold = 5;
+                    if (doc.RootElement.TryGetProperty("parameters", out var p) && int.TryParse(p.GetString(), out var t))
+                        threshold = t;
+
+                    var idleMinutes = (DateTime.Now - _lastActivityTime).TotalMinutes;
+                    if (idleMinutes < threshold)
+                        return false;
+                }
+            }
+            catch { }
+
+            return true;
+        }
+
         /// <summary>使用 LLM 处理事件</summary>
         private async Task ProcessWithLlmAsync(EventData eventData, string? userMessage = null)
         {
@@ -609,6 +666,7 @@ namespace MochiBot.Src.Agent
                         BuiltinTasks.Murmur => MurmurPrompt,
                         BuiltinTasks.EyeRest => EyeRestPrompt,
                         BuiltinTasks.LateNight => LateNightPrompt,
+                        BuiltinTasks.IdleCheck => IdleCheckPrompt,
                         _ => $"事件类型：{type}。请根据这个事件生成合适的回复。"
                     };
                 }
