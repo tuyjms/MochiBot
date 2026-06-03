@@ -3,7 +3,6 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using MochiBot.Src.Core.Config;
 using MochiBot.Src.Core.Events;
-using MochiBot.Src.EventModels;
 using MochiBot.Src.Services;
 
 namespace MochiBot.Src.UI
@@ -205,8 +204,8 @@ namespace MochiBot.Src.UI
             }
             _settingsWindow = new SettingsWindow(_configReader, _eventDispatcher, this, _userConfigRepository);
             _settingsWindow.Owner = this;
-            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
-            _settingsWindow.Show();
+            _settingsWindow.ShowDialog();
+            _settingsWindow = null;
         }
 
         // ========== 窗口关闭 ==========

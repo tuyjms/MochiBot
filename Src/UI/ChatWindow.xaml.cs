@@ -181,6 +181,14 @@ namespace MochiBot.Src.UI
             Hide();
         }
 
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+            {
+                DragMove();
+            }
+        }
+
         /// <summary>
         /// 窗口关闭时隐藏而非销毁，保持聊天记录
         /// </summary>

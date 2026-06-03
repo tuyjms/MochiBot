@@ -1,11 +1,8 @@
 using System.IO;
-using System.Windows;
 using MochiBot.Src.Agent;
 using MochiBot.Src.Core.Config;
 using MochiBot.Src.Core.Events;
-using MochiBot.Src.Services;
 using MochiBot.Src.Services.Tool;
-using MochiBot.Src.UI;
 
 namespace MochiBot
 {
@@ -54,7 +51,7 @@ namespace MochiBot
                 var builtinInitializer = new BuiltinTaskInitializer(EventDispatcher, configReader);
                 builtinInitializer.Initialize();
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[Main] 初始化失败: {ex.Message}");
             }
