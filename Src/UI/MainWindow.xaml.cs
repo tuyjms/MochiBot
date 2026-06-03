@@ -45,6 +45,12 @@ namespace MochiBot.Src.UI
         private bool _isPassthrough;
         private Window? _passthroughWindow;
 
+        // 穿透按钮拖动（相对于主窗口的偏移量）
+        private Point _dragStartPoint;
+        private bool _isDragging;
+        private double _passthroughOffsetX = 4;
+        private double _passthroughOffsetY = 4;
+
         /// <summary>当前是否处于穿透模式</summary>
         public bool IsPassthrough => _isPassthrough;
 
@@ -64,6 +70,7 @@ namespace MochiBot.Src.UI
 
         private static readonly IntPtr HWND_TOP = IntPtr.Zero;
         private const uint SWP_NOZORDER = 0x0004;
+        private const uint SWP_NOSIZE = 0x0001;
 
         public MainWindow(IEventDispatcher eventDispatcher, IConfigReader configReader, UserConfigRepository? userConfigRepository = null)
         {
@@ -502,7 +509,51 @@ namespace MochiBot.Src.UI
                 BorderThickness = new Thickness(0),
                 Cursor = System.Windows.Input.Cursors.Hand
             };
-            btn.Click += (_, _) => TogglePassthrough();
+
+            // 点击 vs 拖动区分：拖动改变按钮相对于主窗口的位置
+            btn.PreviewMouseLeftButtonDown += (_, e) =>
+            {
+                // 使用屏幕坐标（物理像素），避免窗口移动导致坐标系漂移
+                _dragStartPoint = btn.PointToScreen(e.GetPosition(btn));
+                _isDragging = false;
+                btn.CaptureMouse();
+                e.Handled = true;
+            };
+
+            btn.PreviewMouseMove += (_, e) =>
+            {
+                if (!btn.IsMouseCaptured) return;
+                var screenPos = btn.PointToScreen(e.GetPosition(btn));
+                var dx = screenPos.X - _dragStartPoint.X;
+                var dy = screenPos.Y - _dragStartPoint.Y;
+                if (Math.Abs(dx) > 3 || Math.Abs(dy) > 3)
+                    _isDragging = true;
+                if (_isDragging)
+                {
+                    var source = PresentationSource.FromVisual(this);
+                    var dpi = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+                    // 屏幕像素增量 → DIP 偏移
+                    _passthroughOffsetX += dx / dpi;
+                    _passthroughOffsetY += dy / dpi;
+                    _passthroughOffsetX = Math.Clamp(_passthroughOffsetX, 0, Width - 42);
+                    _passthroughOffsetY = Math.Clamp(_passthroughOffsetY, 0, Height - 42);
+                    _dragStartPoint = screenPos;
+                    // Win32 直接移动，绕过 WPF 渲染管线
+                    var pwHwnd = new WindowInteropHelper(_passthroughWindow!).Handle;
+                    SetWindowPos(pwHwnd, HWND_TOP,
+                        (int)((Left + _passthroughOffsetX) * dpi),
+                        (int)((Top + _passthroughOffsetY) * dpi),
+                        0, 0, SWP_NOSIZE | SWP_NOZORDER);
+                }
+            };
+
+            btn.PreviewMouseLeftButtonUp += (_, e) =>
+            {
+                btn.ReleaseMouseCapture();
+                if (!_isDragging)
+                    TogglePassthrough();
+                e.Handled = true;
+            };
 
             _passthroughWindow = new Window
             {
@@ -528,9 +579,8 @@ namespace MochiBot.Src.UI
         private void PositionPassthroughWindow()
         {
             if (_passthroughWindow == null) return;
-            // 放在主窗口右下角
-            _passthroughWindow.Left = Left + Width - _passthroughWindow.Width - 4;
-            _passthroughWindow.Top = Top + Height + 4;
+            _passthroughWindow.Left = Left + _passthroughOffsetX;
+            _passthroughWindow.Top = Top + _passthroughOffsetY;
         }
 
         private void ClosePassthroughWindow()
