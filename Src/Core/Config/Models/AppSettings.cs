@@ -50,6 +50,6 @@ namespace MochiBot.Src.Core.Config.Models
         public double PassthroughOpacity { get; set; } = 0.3;
 
         /// <summary>调试开关：事件处理后将短期记忆内容打印到日志</summary>
-        public bool DebugLogToolResult { get; set; } = true;
+        public bool DebugLogToolResult { get; set; } = false;
     }
 }
