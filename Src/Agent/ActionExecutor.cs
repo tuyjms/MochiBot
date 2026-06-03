@@ -24,6 +24,9 @@ namespace MochiBot.Src.Agent
         private readonly Action<string, string> _onMemoryLog;
         private readonly Action<string> _onAnimation;
 
+        /// <summary>工具结果截断上限（避免短期记忆被撑爆）</summary>
+        private const int ToolResultMaxLength = 500;
+
         public ActionExecutor(
             IToolService toolService,
             Action<AgentMood> onMoodChange,
@@ -197,8 +200,18 @@ namespace MochiBot.Src.Agent
             System.Diagnostics.Debug.WriteLine(
                 $"[ActionExecutor] 工具执行: {action.Name}: {(result.Success ? "成功" : $"失败: {result.Error}")}");
 
-            // 记录工具执行到短期记忆
-            _onMemoryLog(TagToolExecution, action.Name ?? "");
+            // 记录工具执行结果到短期记忆（LLM 工具调用循环依赖此数据）
+            if (result.Success && !string.IsNullOrEmpty(result.Data))
+            {
+                var truncated = result.Data.Length > ToolResultMaxLength
+                    ? result.Data[..ToolResultMaxLength] + "...(截断)"
+                    : result.Data;
+                _onMemoryLog(TagToolExecution, $"{action.Name} → {truncated}");
+            }
+            else
+            {
+                _onMemoryLog(TagToolExecution, action.Name ?? "");
+            }
 
             if (result.Success && !string.IsNullOrEmpty(result.Data))
             {
@@ -229,8 +242,18 @@ namespace MochiBot.Src.Agent
             System.Diagnostics.Debug.WriteLine(
                 $"[ActionExecutor] 插件执行: {action.Name}: {(result.Success ? "成功" : $"失败: {result.Error}")}");
 
-            // 记录插件执行到短期记忆
-            _onMemoryLog(TagPluginExecution, action.Name ?? "");
+            // 记录插件执行结果到短期记忆（LLM 工具调用循环依赖此数据）
+            if (result.Success && !string.IsNullOrEmpty(result.Data))
+            {
+                var truncated = result.Data.Length > ToolResultMaxLength
+                    ? result.Data[..ToolResultMaxLength] + "...(截断)"
+                    : result.Data;
+                _onMemoryLog(TagPluginExecution, $"{action.Name} → {truncated}");
+            }
+            else
+            {
+                _onMemoryLog(TagPluginExecution, action.Name ?? "");
+            }
         }
 
         private Task HandleMcpCallAsync(AgentAction action)

@@ -320,7 +320,10 @@ namespace MochiBot.Src.Agent
             }
         }
 
-        /// <summary>使用 LLM 处理事件</summary>
+        /// <summary>工具调用循环最大迭代次数（防止无限循环）</summary>
+        private const int MaxToolLoopIterations = 5;
+
+        /// <summary>使用 LLM 处理事件（含工具调用循环）</summary>
         private async Task ProcessWithLlmAsync(EventData eventData, string userMessage)
         {
             // 1. 记录用户消息到短期记忆
@@ -329,37 +332,77 @@ namespace MochiBot.Src.Agent
             // 检查是否需要触发短期记忆总结
             await _memoryCoordinator.CheckAndSummarizeIfNeededAsync();
 
-            // 2. 构建完整 Prompt
+            // 2. 构建系统 Prompt（循环内不变）
             var systemPrompt = _promptBuilder.BuildSystemPrompt(
                 _personality, _currentSubPersonality, _appSettings, _moodManager.CurrentMood);
-            var longTermStr = await _memoryCoordinator.RetrieveLongTermMemoryAsync(userMessage);
-            var recentMessages = _memoryCoordinator.ShortTermMemory.GetRecentMessages(10);
-            var shortTermStr = string.Join("\n", recentMessages.Select(m => $"[{m.Role}] {m.Content}"));
-            var userContext = _promptBuilder.BuildUserContext(
-                userMessage, longTermStr, shortTermStr, _lastJsonError);
 
-            // 3. 调用 LLM（对话模式）
-            var messages = new List<ChatMessage>
+            // 3. 工具调用循环：LLM 调用 → 执行 actions → 若有工具调用则带着结果继续循环
+            var reply = string.Empty;
+            var fallbackReply = string.Empty;
+            var lastRawResponse = string.Empty;
+            var hadToolCall = false;
+
+            for (int iteration = 0; iteration < MaxToolLoopIterations; iteration++)
             {
-                new() { Role = ChatRoles.System, Content = systemPrompt },
-                new() { Role = ChatRoles.User, Content = userContext }
-            };
+                // 3a. 构建用户上下文（每次循环读取最新短期记忆，包含工具执行结果）
+                var longTermStr = await _memoryCoordinator.RetrieveLongTermMemoryAsync(userMessage);
+                var recentMessages = _memoryCoordinator.ShortTermMemory.GetRecentMessages(10);
+                var shortTermStr = string.Join("\n", recentMessages.Select(m => $"[{m.Role}] {m.Content}"));
+                var userContext = _promptBuilder.BuildUserContext(
+                    userMessage, longTermStr, shortTermStr, _lastJsonError);
 
-            var response = await CallLlmChatAsync(messages);
+                // 3b. 调用 LLM
+                var messages = new List<ChatMessage>
+                {
+                    new() { Role = ChatRoles.System, Content = systemPrompt },
+                    new() { Role = ChatRoles.User, Content = userContext }
+                };
 
-            // 4. 解析 LLM 响应，提取 actions 和可能的 fallback 回复
-            var (fallbackReply, actions) = ParseResponse(response);
+                var response = await CallLlmChatAsync(messages);
+                lastRawResponse = response;
 
-            // 5. 执行 actions，从中提取 reply 工具的回复文本（执行结果自动记录到短期记忆）
-            var reply = await _actionExecutor.ExecuteActionsAsync(actions, _appSettings.MaxActionsPerResponse);
+                // 3c. 解析 LLM 响应
+                var (parsedReply, actions) = ParseResponse(response);
+                fallbackReply = parsedReply;
 
-            // 6. 如果 actions 中没有 reply 但有 fallback 回复（JSON解析失败时），使用 fallback
-            if (string.IsNullOrEmpty(reply) && !string.IsNullOrEmpty(fallbackReply) && fallbackReply != response)
+                // 3d. 执行 actions（工具结果自动记录到短期记忆）
+                reply = await _actionExecutor.ExecuteActionsAsync(actions, _appSettings.MaxActionsPerResponse);
+
+                // 3e. 判断是否还有工具调用（排除 reply/mood/animation/memory 等非工具类型）
+                hadToolCall = actions?.Any(a =>
+                    a.Type == ActionTypes.ToolCall ||
+                    a.Type == ActionTypes.PluginCall ||
+                    a.Type == ActionTypes.McpCall) ?? false;
+
+                // 3f. 如果有 reply 或者没有工具调用，结束循环
+                if (!string.IsNullOrEmpty(reply) || !hadToolCall)
+                    break;
+
+                _configReader.Logger.Debug($"[Agent] 工具调用循环第 {iteration + 1} 轮，继续调用 LLM");
+            }
+
+            // 调试：打印短期记忆内容到日志
+            if (_appSettings.DebugLogToolResult)
+            {
+                var debugMessages = _memoryCoordinator.ShortTermMemory.GetRecentMessages(20);
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("[Debug] 短期记忆内容：");
+                for (int i = 0; i < debugMessages.Count; i++)
+                {
+                    var m = debugMessages[i];
+                    sb.AppendLine($"  [{i}] [{m.Role}] {m.Content}");
+                }
+                _configReader.Logger.Debug(sb.ToString());
+            }
+
+            // 4. 如果循环结束仍无 reply 但有 fallback（JSON解析失败时的原始文本），使用 fallback
+            //    排除 fallback 等于原始 JSON 响应的情况（那不是真正的回复）
+            if (string.IsNullOrEmpty(reply) && !string.IsNullOrEmpty(fallbackReply) && fallbackReply != lastRawResponse)
             {
                 reply = fallbackReply;
             }
 
-            // 7. 如果有回复，记录到短期记忆并发布回复事件
+            // 5. 如果有回复，记录到短期记忆并发布回复事件
             if (!string.IsNullOrEmpty(reply))
             {
                 _memoryCoordinator.ShortTermMemory.AddMessage(ChatRoles.Assistant, reply);

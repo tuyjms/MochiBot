@@ -48,5 +48,8 @@ namespace MochiBot.Src.Core.Config.Models
 
         /// <summary>鼠标穿透模式下窗口透明度（0.1~1.0）</summary>
         public double PassthroughOpacity { get; set; } = 0.3;
+
+        /// <summary>调试开关：事件处理后将短期记忆内容打印到日志</summary>
+        public bool DebugLogToolResult { get; set; } = true;
     }
 }
