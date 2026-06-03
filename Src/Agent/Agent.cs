@@ -67,6 +67,17 @@ namespace MochiBot.Src.Agent
             // 创建记忆协调器（管理短期/长期记忆）
             _memoryCoordinator = new MemoryCoordinator(_functionProviderName, _functionModelName, _configReader);
 
+            _promptBuilder = new PromptBuilder(_toolService);
+
+            // 创建自动事件过滤器（内置任务条件判断）
+            _autoEventFilter = new AutoEventFilter(
+                _toolService,
+                (role, content) => _memoryCoordinator.ShortTermMemory.AddMessage(role, content),
+                evt => _eventDispatcher.Publish(evt));
+
+            // 创建事件处理队列（实际处理逻辑委托给 ProcessEventInternalAsync）
+            _eventQueue = new EventProcessingQueue(_eventDispatcher, _configReader, ProcessEventInternalAsync);
+
             // 创建 ActionExecutor，将 actions 执行逻辑委托给它
             _actionExecutor = new ActionExecutor(
                 _toolService,
@@ -86,17 +97,6 @@ namespace MochiBot.Src.Agent
                         })
                     });
                 });
-
-            _promptBuilder = new PromptBuilder(_toolService);
-
-            // 创建自动事件过滤器（内置任务条件判断）
-            _autoEventFilter = new AutoEventFilter(
-                _toolService,
-                (role, content) => _memoryCoordinator.ShortTermMemory.AddMessage(role, content),
-                evt => _eventDispatcher.Publish(evt));
-
-            // 创建事件处理队列（实际处理逻辑委托给 ProcessEventInternalAsync）
-            _eventQueue = new EventProcessingQueue(_eventDispatcher, _configReader, ProcessEventInternalAsync);
 
             // 订阅事件调度器
             SubscribeToEvents();
