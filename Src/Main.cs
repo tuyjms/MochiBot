@@ -1,5 +1,6 @@
 using System.IO;
 using MochiBot.Src.Agent;
+using MochiBot.Src.Core;
 using MochiBot.Src.Core.Config;
 using MochiBot.Src.Core.Events;
 using MochiBot.Src.Services.Tool;
@@ -30,7 +31,7 @@ namespace MochiBot
             try
             {
                 // 初始化配置读取器
-                var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "appsettings.json");
+                var configPath = Path.Combine(AppPaths.ExeDirectory, "Resources", "appsettings.json");
                 ConfigReader.Initialize(configPath);
                 var configReader = ConfigReader.Instance;
 

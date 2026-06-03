@@ -8,6 +8,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
+using MochiBot.Src.Core;
 using MochiBot.Src.Core.Config;
 using MochiBot.Src.Core.Config.Models;
 using MochiBot.Src.Core.Events;
@@ -96,22 +97,7 @@ namespace MochiBot.Src.UI
 
         private string ResolveImagesPath()
         {
-            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            var imagesPath = Path.Combine(baseDir, "Resources", "Images");
-            if (!Directory.Exists(imagesPath))
-            {
-                var rootDir = baseDir;
-                for (int i = 0; i < 5; i++)
-                {
-                    var parent = Directory.GetParent(rootDir);
-                    if (parent == null) break;
-                    rootDir = parent.FullName;
-                    if (File.Exists(Path.Combine(rootDir, "MochiBot.sln")))
-                        break;
-                }
-                imagesPath = Path.Combine(rootDir, "Resources", "Images");
-            }
-            return imagesPath;
+            return Path.Combine(AppPaths.ResourcesDir, "Images");
         }
 
         private void SubscribeToGifMoodEvents()
@@ -257,22 +243,7 @@ namespace MochiBot.Src.UI
 
         private string ResolveResourcesPath()
         {
-            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            var resourcesPath = Path.Combine(baseDir, "Resources");
-            if (!Directory.Exists(resourcesPath))
-            {
-                var rootDir = baseDir;
-                for (int i = 0; i < 5; i++)
-                {
-                    var parent = Directory.GetParent(rootDir);
-                    if (parent == null) break;
-                    rootDir = parent.FullName;
-                    if (File.Exists(Path.Combine(rootDir, "MochiBot.sln")))
-                        break;
-                }
-                resourcesPath = Path.Combine(rootDir, "Resources");
-            }
-            return resourcesPath;
+            return AppPaths.ResourcesDir;
         }
 
         private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs args)

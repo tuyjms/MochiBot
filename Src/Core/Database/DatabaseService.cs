@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using Microsoft.Data.Sqlite;
+using MochiBot.Src.Core;
 
 namespace MochiBot.Src.Core.Database
 {
@@ -15,7 +16,7 @@ namespace MochiBot.Src.Core.Database
 
         public DatabaseService()
         {
-            var dbDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Data");
+            var dbDir = Path.Combine(AppPaths.ResourcesDir, "Data");
             if (!Directory.Exists(dbDir))
                 Directory.CreateDirectory(dbDir);
 

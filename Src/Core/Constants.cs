@@ -1,5 +1,24 @@
+using System.IO;
+
 namespace MochiBot.Src.Core
 {
+    /// <summary>
+    /// 应用程序路径解析（兼容 PublishSingleFile 模式）
+    /// 单文件自解压时 BaseDirectory 指向临时解压目录，Resources 随之释放
+    /// </summary>
+    public static class AppPaths
+    {
+        /// <summary>
+        /// 获取程序基目录（单文件模式下为临时解压目录，Resources 随之释放）
+        /// </summary>
+        public static string ExeDirectory => AppDomain.CurrentDomain.BaseDirectory;
+
+        /// <summary>
+        /// 获取 Resources 目录路径
+        /// </summary>
+        public static string ResourcesDir => Path.Combine(ExeDirectory, "Resources");
+    }
+
     /// <summary>
     /// 全局常量定义
     /// 集中管理所有协议级标识符，避免魔法字符串散落在各模块中

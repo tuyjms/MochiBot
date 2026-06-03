@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using MochiBot.Src.Core;
 using MochiBot.Src.Core.Config.Models;
 using MochiBot.Src.Core.Events;
 using static MochiBot.Src.Core.Constants;
@@ -46,7 +47,7 @@ namespace MochiBot.Src.Core.Config
         private ConfigReader(string configPath, string? personalitiesDir = null)
         {
             _configPath = configPath;
-            _personalitiesDir = personalitiesDir ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Personalities");
+            _personalitiesDir = personalitiesDir ?? Path.Combine(AppPaths.ResourcesDir, "Personalities");
             _logger = new ConsoleLogger(this);
             Reload();
         }
@@ -607,7 +608,7 @@ namespace MochiBot.Src.Core.Config
         {
             try
             {
-                var logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Logs");
+                var logDir = Path.Combine(AppPaths.ResourcesDir, "Logs");
                 Directory.CreateDirectory(logDir);
                 var logFile = Path.Combine(logDir, $"{DateTime.Now:yyyy-MM-dd}.log");
                 _logFileWriter = new StreamWriter(logFile, append: true) { AutoFlush = true };

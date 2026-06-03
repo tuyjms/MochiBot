@@ -21,9 +21,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="Resources\**\*">
+    <Content Include="Resources\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    </Content>
   </ItemGroup>
 
 </Project>

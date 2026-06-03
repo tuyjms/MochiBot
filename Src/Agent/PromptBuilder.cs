@@ -23,6 +23,7 @@ namespace MochiBot.Src.Agent
 你是一个名叫{Name}，你的性格是{Personality}。
 你的主人（用户）叫{UserName}，请用这个名字称呼。
 【当前情绪】{CurrentMood}
+【当前时间】{CurrentTime}
 
 【可用工具】{BaseTools}
 
@@ -84,12 +85,28 @@ namespace MochiBot.Src.Agent
             // 工具调用格式说明
             var formatInstruction = _toolService.GetFormatInstruction();
 
+            // 当前时间信息
+            var now = DateTime.Now;
+            var dayOfWeek = now.DayOfWeek switch
+            {
+                DayOfWeek.Monday => "周一",
+                DayOfWeek.Tuesday => "周二",
+                DayOfWeek.Wednesday => "周三",
+                DayOfWeek.Thursday => "周四",
+                DayOfWeek.Friday => "周五",
+                DayOfWeek.Saturday => "周六",
+                DayOfWeek.Sunday => "周日",
+                _ => ""
+            };
+            var currentTime = $"{now:yyyy-MM-dd HH:mm} {dayOfWeek}";
+
             return _systemPromptFormatter.Format(new Dictionary<string, string>
             {
                 { "Name", name },
                 { "Personality", personalityDesc },
                 { "UserName", userName },
                 { "CurrentMood", $"{currentMood}" },
+                { "CurrentTime", currentTime },
                 { "BaseTools", baseToolsDesc },
                 { "MoodTools", moodToolsDesc },
                 { "FormatInstruction", formatInstruction }
