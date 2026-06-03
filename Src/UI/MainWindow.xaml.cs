@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
@@ -32,6 +33,7 @@ namespace MochiBot.Src.UI
         private System.Windows.Controls.Image? _gifImage;
         private CharacterRenderer? _renderer;
         private DispatcherTimer? _timer;
+        private DispatcherTimer? _toolbarHideTimer;
         private string? _moodSubscriptionId;
 
         // VRM 模式
@@ -136,6 +138,13 @@ namespace MochiBot.Src.UI
             _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
             _timer.Tick += (_, _) => UpdateImage();
             _timer.Start();
+
+            _toolbarHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+            _toolbarHideTimer.Tick += (_, _) =>
+            {
+                toolbarPanel.Visibility = Visibility.Collapsed;
+                _toolbarHideTimer.Stop();
+            };
 
             SubscribeToGifMoodEvents();
         }
@@ -337,7 +346,7 @@ namespace MochiBot.Src.UI
                         SubscribeToVrmEvents();
                         break;
                     case "toggleToolbar":
-                        Dispatcher.Invoke(ToggleToolbar);
+                        // 工具栏已改为自动隐藏，忽略 VRM 点击切换
                         break;
                 }
             }
@@ -595,7 +604,14 @@ namespace MochiBot.Src.UI
         private void OnSourceInitialized(object? sender, EventArgs e)
         {
             var hwnd = new WindowInteropHelper(this).Handle;
-            _trayIcon = new TrayIcon(hwnd, "MochiBot", RestoreFromTray);
+            var menuItems = new TrayIcon.MenuItem[]
+            {
+                new("鼠标穿透", () => Dispatcher.Invoke(TogglePassthrough), () => _isPassthrough),
+                new("设置", () => Dispatcher.Invoke(() => SettingsButton_Click(this, new RoutedEventArgs()))),
+                new("聊天", () => Dispatcher.Invoke(() => ToggleChatButton_Click(this, new RoutedEventArgs())))
+            };
+            _trayIcon = new TrayIcon(hwnd, "MochiBot", RestoreFromTray, menuItems);
+            _trayIcon.Show();
             var source = HwndSource.FromHwnd(hwnd);
             source?.AddHook(WndProcHook);
         }
@@ -609,18 +625,10 @@ namespace MochiBot.Src.UI
             return IntPtr.Zero;
         }
 
-        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
-        {
-            Hide();
-            _trayIcon?.Show();
-            _configReader.Logger.Info("[MainWindow] 已最小化到系统托盘");
-        }
-
         private void RestoreFromTray()
         {
             Show();
             Activate();
-            _trayIcon?.Hide();
             _configReader.Logger.Info("[MainWindow] 已从系统托盘恢复");
         }
 
@@ -631,16 +639,27 @@ namespace MochiBot.Src.UI
             DragMove();
         }
 
-        private void Window_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        // ========== 工具栏自动隐藏 ==========
+
+        private void toolbarHitZone_MouseEnter(object sender, MouseEventArgs e)
         {
-            ToggleToolbar();
+            _toolbarHideTimer?.Stop();
+            toolbarPanel.Visibility = Visibility.Visible;
         }
 
-        private void ToggleToolbar()
+        private void toolbarHitZone_MouseLeave(object sender, MouseEventArgs e)
         {
-            toolbarPanel.Visibility = toolbarPanel.Visibility == Visibility.Visible
-                ? Visibility.Collapsed
-                : Visibility.Visible;
+            _toolbarHideTimer?.Start();
+        }
+
+        private void toolbarPanel_MouseEnter(object sender, MouseEventArgs e)
+        {
+            _toolbarHideTimer?.Stop();
+        }
+
+        private void toolbarPanel_MouseLeave(object sender, MouseEventArgs e)
+        {
+            _toolbarHideTimer?.Start();
         }
 
         private void ToggleChatButton_Click(object sender, RoutedEventArgs e)

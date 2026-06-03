@@ -5,50 +5,9 @@
         WindowStyle="None" AllowsTransparency="True" Background="#01000000"
         Topmost="True"
         WindowStartupLocation="Manual"
-        MouseLeftButtonDown="Window_MouseLeftButtonDown"
-        MouseRightButtonDown="Window_MouseRightButtonDown">
-    <DockPanel>
-        <!-- 工具栏（右键切换显示，固定在底部） -->
-        <StackPanel x:Name="toolbarPanel"
-                    DockPanel.Dock="Bottom"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right"
-                    Margin="0,0,10,10">
-            <!-- 最小化到托盘 -->
-            <Border Width="36" Height="36"
-                    Margin="0,0,6,0"
-                    CornerRadius="18"
-                    Background="#CCFFFFFF">
-                <Button Content="🔽"
-                        FontSize="14"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Click="MinimizeButton_Click"/>
-            </Border>
-            <!-- 设置按钮 -->
-            <Border Width="36" Height="36"
-                    Margin="0,0,6,0"
-                    CornerRadius="18"
-                    Background="#CCFFFFFF">
-                <Button Content="⚙️"
-                        FontSize="16"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Click="SettingsButton_Click"/>
-            </Border>
-            <!-- 切换聊天按钮 -->
-            <Border Width="36" Height="36"
-                    CornerRadius="18"
-                    Background="#CCFFFFFF">
-                <Button Content="💬"
-                        FontSize="18"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Click="ToggleChatButton_Click"/>
-            </Border>
-        </StackPanel>
-
-        <!-- 渲染表面（填充剩余空间，代码中动态添加 Image 或 WebView2） -->
+        MouseLeftButtonDown="Window_MouseLeftButtonDown">
+    <Grid>
+        <!-- 渲染表面（占满整个窗口，代码中动态添加 Image 或 WebView2） -->
         <Grid x:Name="characterContainer">
             <!-- 聊天气泡 -->
             <Border x:Name="chatBubble"
@@ -83,5 +42,45 @@
                 </StackPanel>
             </Border>
         </Grid>
-    </DockPanel>
+
+        <!-- 底部鼠标悬停检测区域（透明覆盖层，触发工具栏显示） -->
+        <Border x:Name="toolbarHitZone"
+                VerticalAlignment="Bottom"
+                Height="60"
+                Background="Transparent"
+                MouseEnter="toolbarHitZone_MouseEnter"
+                MouseLeave="toolbarHitZone_MouseLeave"/>
+
+        <!-- 工具栏（悬停底部自动显示，浮在角色上方） -->
+        <StackPanel x:Name="toolbarPanel"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Bottom"
+                    Margin="0,0,10,10"
+                    Visibility="Collapsed"
+                    MouseEnter="toolbarPanel_MouseEnter"
+                    MouseLeave="toolbarPanel_MouseLeave">
+            <!-- 设置按钮 -->
+            <Border Width="36" Height="36"
+                    Margin="0,0,6,0"
+                    CornerRadius="18"
+                    Background="#CCFFFFFF">
+                <Button Content="⚙️"
+                        FontSize="16"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Click="SettingsButton_Click"/>
+            </Border>
+            <!-- 切换聊天按钮 -->
+            <Border Width="36" Height="36"
+                    CornerRadius="18"
+                    Background="#CCFFFFFF">
+                <Button Content="💬"
+                        FontSize="18"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Click="ToggleChatButton_Click"/>
+            </Border>
+        </StackPanel>
+    </Grid>
 </Window>
