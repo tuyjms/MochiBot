@@ -102,12 +102,4 @@ public class PromptFormatterTests
         Assert.Equal("纯文本模板", result);
     }
 
-    // ========== 接口实现 ==========
-
-    [Fact]
-    public void Implements_IPromptFormatter()
-    {
-        var formatter = new PromptFormatter("test");
-        Assert.IsAssignableFrom<IPromptFormatter>(formatter);
-    }
 }
