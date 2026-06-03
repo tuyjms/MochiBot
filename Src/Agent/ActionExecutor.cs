@@ -9,23 +9,30 @@ namespace MochiBot.Src.Agent
     /// Action 执行器
     /// 负责解析和执行 LLM 返回的 actions 数组
     /// 统一调度 tool_call / plugin_call / mcp_call / mood_change / midterm_memory / animation
+    /// 执行结果自动通过回调记录到短期记忆
     /// </summary>
     public class ActionExecutor
     {
+        // 短期记忆中的系统消息标签
+        public const string TagMidTermMemory = "[中期记忆]";
+        public const string TagToolExecution = "[工具执行]";
+        public const string TagPluginExecution = "[插件执行]";
+        public const string TagMcpExecution = "[MCP执行]";
+
         private readonly IToolService _toolService;
         private readonly Action<AgentMood> _onMoodChange;
-        private readonly Action<string, string> _onMemoryRecord;
+        private readonly Action<string, string> _onMemoryLog;
         private readonly Action<string> _onAnimation;
 
         public ActionExecutor(
             IToolService toolService,
             Action<AgentMood> onMoodChange,
-            Action<string, string>? onMemoryRecord = null,
+            Action<string, string>? onMemoryLog = null,
             Action<string>? onAnimation = null)
         {
             _toolService = toolService ?? throw new ArgumentNullException(nameof(toolService));
             _onMoodChange = onMoodChange ?? throw new ArgumentNullException(nameof(onMoodChange));
-            _onMemoryRecord = onMemoryRecord ?? ((_, _) => { });
+            _onMemoryLog = onMemoryLog ?? ((_, _) => { });
             _onAnimation = onAnimation ?? (_ => { });
         }
 
@@ -190,6 +197,9 @@ namespace MochiBot.Src.Agent
             System.Diagnostics.Debug.WriteLine(
                 $"[ActionExecutor] 工具执行: {action.Name}: {(result.Success ? "成功" : $"失败: {result.Error}")}");
 
+            // 记录工具执行到短期记忆
+            _onMemoryLog(TagToolExecution, action.Name ?? "");
+
             if (result.Success && !string.IsNullOrEmpty(result.Data))
             {
                 try
@@ -218,6 +228,9 @@ namespace MochiBot.Src.Agent
 
             System.Diagnostics.Debug.WriteLine(
                 $"[ActionExecutor] 插件执行: {action.Name}: {(result.Success ? "成功" : $"失败: {result.Error}")}");
+
+            // 记录插件执行到短期记忆
+            _onMemoryLog(TagPluginExecution, action.Name ?? "");
         }
 
         private Task HandleMcpCallAsync(AgentAction action)
@@ -225,6 +238,9 @@ namespace MochiBot.Src.Agent
             // MCP 工具调用（留空，作为 feature 后续实现）
             System.Diagnostics.Debug.WriteLine(
                 $"[ActionExecutor] MCP执行: {action.ServerName}/{action.Name}（暂未实现）");
+
+            // 记录 MCP 执行到短期记忆
+            _onMemoryLog(TagMcpExecution, $"{action.ServerName}/{action.Name}");
             return Task.CompletedTask;
         }
 
@@ -238,7 +254,7 @@ namespace MochiBot.Src.Agent
 
         private void HandleMidtermMemory(AgentAction action)
         {
-            _onMemoryRecord(action.Description ?? "", action.Parameters ?? "");
+            _onMemoryLog(TagMidTermMemory, action.Description ?? "");
         }
 
         private void HandleAnimation(AgentAction action)

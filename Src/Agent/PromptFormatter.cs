@@ -4,7 +4,7 @@
     /// Prompt格式化器实现
     /// 通用模板格式化工具，接收模板字符串和变量字典，将占位符替换为实际值
     /// </summary>
-    public class PromptFormatter : IPromptFormatter
+    public class PromptFormatter
     {
         private readonly string _template;
 
