@@ -60,7 +60,9 @@ controls.dampingFactor = CAMERA.DAMPING_FACTOR;
 controls.minDistance = CAMERA.MIN_DISTANCE;
 controls.maxDistance = CAMERA.MAX_DISTANCE;
 controls.maxPolarAngle = CAMERA.MAX_POLAR_ANGLE;
-controls.enablePan = CAMERA.ENABLE_PAN;
+controls.enablePan = false;
+controls.enableRotate = false;
+controls.enableZoom = false;
 controls.update();
 
 scene.add(new THREE.AmbientLight(LIGHTS.AMBIENT.color, LIGHTS.AMBIENT.intensity));
@@ -137,8 +139,9 @@ window.resetExpressions = function() {
 function handleMessage(msg) {
   if (!msg || !msg.type) return;
   switch (msg.type) {
-    case 'mood':  handleMood(msg.expression); break;
-    case 'state': handleState(msg.state); break;
+    case 'mood':    handleMood(msg.expression); break;
+    case 'state':   handleState(msg.state); break;
+    case 'opacity': document.body.style.opacity = msg.value; break;
   }
 }
 

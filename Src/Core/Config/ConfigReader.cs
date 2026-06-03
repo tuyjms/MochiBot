@@ -551,6 +551,9 @@ namespace MochiBot.Src.Core.Config
                 settings.LogLevel = GetStringProperty(appSettingsElement, "LogLevel", "Info");
                 settings.LogToFile = GetBoolProperty(appSettingsElement, "LogToFile", true);
                 settings.LogToConsole = GetBoolProperty(appSettingsElement, "LogToConsole", true);
+                settings.CloseBehavior = GetStringProperty(appSettingsElement, "CloseBehavior", "Exit");
+                if (appSettingsElement.TryGetProperty("PassthroughOpacity", out var opacityProp) && opacityProp.ValueKind == JsonValueKind.Number)
+                    settings.PassthroughOpacity = opacityProp.GetDouble();
             }
 
             _cachedAppConfig = new AppConfig { Providers = providers, Settings = settings };

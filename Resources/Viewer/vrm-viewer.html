@@ -6,8 +6,19 @@
 <title>VRM Viewer</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: transparent; overflow: hidden; }
+  body { background: transparent; overflow: hidden; -webkit-app-region: drag; }
   canvas { display: block; }
+  /* 顶部拖拽条（窗口标题栏） */
+  #titlebar {
+    position: fixed; top: 0; left: 0; right: 0; height: 32px;
+    -webkit-app-region: drag;
+    z-index: 100;
+  }
+  /* 右键菜单按钮（排除拖拽） */
+  #titlebar .btn {
+    -webkit-app-region: no-drag;
+    cursor: pointer;
+  }
   #status {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     color: #ccc; font-size: 16px; text-align: center; pointer-events: none;
@@ -27,11 +38,39 @@
     background: rgba(0,0,0,0.55); padding: 8px 10px; border-radius: 4px;
     pointer-events: none; z-index: 5; max-width: 300px; line-height: 1.6;
   }
+  /* 聊天气泡 */
+  #chatBubble {
+    display: none;
+    position: absolute; top: 10px; left: 10px;
+    background: rgba(255,255,255,0.8); border-radius: 12px;
+    padding: 8px 12px; max-width: 220px;
+    -webkit-app-region: no-drag; cursor: pointer; z-index: 200;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    font-family: 'Microsoft YaHei', sans-serif;
+  }
+  #chatBubble .bubble-row { display: flex; align-items: center; gap: 8px; }
+  #chatBubble .avatar {
+    width: 24px; height: 24px; border-radius: 12px;
+    background: #6B5CE7; color: #fff; font-size: 12px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  #chatBubble .text {
+    color: #333; font-size: 13px; line-height: 1.4;
+    overflow: hidden; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
 </style>
 </head>
 <body>
+<div id="titlebar"></div>
 <div id="status"><div class="spinner"></div><div>Loading...</div></div>
 <div id="info"></div>
+<div id="chatBubble">
+  <div class="bubble-row">
+    <div class="avatar" id="bubbleAvatar">宠</div>
+    <div class="text" id="bubbleText"></div>
+  </div>
+</div>
 
 <script>
 var statusEl = document.getElementById('status');
@@ -58,5 +97,33 @@ window.addEventListener('unhandledrejection', function(e) {
 </script>
 
 <script type="module" src="./viewer.js"></script>
+<script>
+// 聊天气泡（供 C# ExecuteScriptAsync 调用）
+const _bubble = document.getElementById('chatBubble');
+const _bubbleAvatar = document.getElementById('bubbleAvatar');
+const _bubbleText = document.getElementById('bubbleText');
+
+function showBubble(text, avatar) {
+  _bubbleAvatar.textContent = avatar || '宠';
+  _bubbleText.textContent = text || '';
+  _bubble.style.display = 'block';
+}
+
+function hideBubble() {
+  _bubble.style.display = 'none';
+}
+
+if (window.chrome?.webview) {
+  _bubble.addEventListener('click', () => {
+    hideBubble();
+    window.chrome.webview.postMessage(JSON.stringify({ type: 'bubbleClicked' }));
+  });
+  // 右键切换工具栏
+  document.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    window.chrome.webview.postMessage(JSON.stringify({ type: 'toggleToolbar' }));
+  });
+}
+</script>
 </body>
 </html>

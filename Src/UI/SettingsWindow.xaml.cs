@@ -23,7 +23,7 @@ namespace MochiBot.Src.UI
         private readonly IConfigReader _configReader;
         private readonly IEventDispatcher _eventDispatcher;
         private readonly UserConfigRepository? _userConfigRepository;
-        private readonly Window _ownerWindow;
+        private readonly MainWindow _ownerWindow;
 
         // 人格编辑用的数据源
         private ObservableCollection<string> _chatModels = new();
@@ -36,7 +36,7 @@ namespace MochiBot.Src.UI
         public SettingsWindow(
             IConfigReader configReader,
             IEventDispatcher eventDispatcher,
-            Window owner,
+            MainWindow owner,
             UserConfigRepository? userConfigRepository = null)
         {
             _configReader = configReader;
@@ -49,7 +49,6 @@ namespace MochiBot.Src.UI
             Owner = owner;
 
             // 在 InitializeComponent 之后绑定事件，避免 XAML 加载时触发
-            opacitySlider.ValueChanged += OpacitySlider_ValueChanged;
             passthroughOpacitySlider.ValueChanged += PassthroughOpacitySlider_ValueChanged;
             _subPersonalities.CollectionChanged += (_, _) => UpdateWeightSum();
 
@@ -75,14 +74,12 @@ namespace MochiBot.Src.UI
                 try
                 {
                     var userConfig = _userConfigRepository.LoadConfigAsync().GetAwaiter().GetResult();
-                    opacitySlider.Value = userConfig.Opacity;
                     murmurEnabledCheck.IsChecked = userConfig.MurmurEnabled;
                     murmurIntervalBox.Text = userConfig.MurmurInterval.ToString();
                 }
                 catch
                 {
                     var defaultMs = new ModuleSettings();
-                    opacitySlider.Value = 1.0;
                     murmurEnabledCheck.IsChecked = defaultMs.AutoEvent_MurmurEnabled;
                     murmurIntervalBox.Text = defaultMs.AutoEvent_MurmurInterval.ToString();
                 }
@@ -90,11 +87,9 @@ namespace MochiBot.Src.UI
             else
             {
                 var defaultMs = new ModuleSettings();
-                opacitySlider.Value = 1.0;
                 murmurEnabledCheck.IsChecked = defaultMs.AutoEvent_MurmurEnabled;
                 murmurIntervalBox.Text = defaultMs.AutoEvent_MurmurInterval.ToString();
             }
-            UpdateOpacityValue();
 
             // LLM 行为
             structuredResponseCheck.IsChecked = appSettings.EnableStructuredResponse;
@@ -106,7 +101,8 @@ namespace MochiBot.Src.UI
             closeBehaviorBox.ItemsSource = AppSettings.ValidCloseBehaviors;
             closeBehaviorBox.SelectedItem = appSettings.CloseBehavior;
 
-            // 穿透透明度
+            // 穿透模式
+            passthroughCheck.IsChecked = _ownerWindow.IsPassthrough;
             passthroughOpacitySlider.Value = appSettings.PassthroughOpacity;
             UpdatePassthroughOpacityValue();
 
@@ -259,6 +255,10 @@ namespace MochiBot.Src.UI
             {
                 personNameBox.Text = config.Name;
                 personDescBox.Text = config.Description;
+
+                // 显示模式
+                var displayMode = config.DisplayMode ?? "Gif";
+                displayModeBox.SelectedIndex = displayMode == "Vrm" ? 1 : 0;
 
                 _chatModels = new ObservableCollection<string>(config.ChatModels ?? new List<string>());
                 chatModelsList.ItemsSource = _chatModels;
@@ -472,17 +472,7 @@ namespace MochiBot.Src.UI
             return true;
         }
 
-        // ==================== 透明度 ====================
-
-        private void UpdateOpacityValue()
-        {
-            opacityValue.Text = $"{opacitySlider.Value:F1}";
-        }
-
-        private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-        {
-            UpdateOpacityValue();
-        }
+        // ==================== 桌宠窗口 ====================
 
         private void UpdatePassthroughOpacityValue()
         {
@@ -492,6 +482,15 @@ namespace MochiBot.Src.UI
         private void PassthroughOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             UpdatePassthroughOpacityValue();
+            // 实时应用透明度
+            if (IsLoaded && _ownerWindow.IsPassthrough)
+                _ownerWindow.SetWindowOpacity(passthroughOpacitySlider.Value);
+        }
+
+        private void PassthroughCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!IsLoaded) return;
+            _ownerWindow.SetPassthrough(passthroughCheck.IsChecked == true);
         }
 
         // ==================== 保存 ====================
@@ -565,7 +564,6 @@ namespace MochiBot.Src.UI
                     {
                         Name = appSettings.UserName,
                         Personality = appSettings.ActivePersonality,
-                        Opacity = opacitySlider.Value,
                         MurmurEnabled = murmurEnabledCheck.IsChecked ?? true,
                         MurmurInterval = murmurInterval,
                         WindowPosX = (int)_ownerWindow.Left,
@@ -573,8 +571,6 @@ namespace MochiBot.Src.UI
                     };
                     await _userConfigRepository.SaveConfigAsync(userConfig);
                 }
-
-                _ownerWindow.Opacity = opacitySlider.Value;
 
                 // ====== 3. 保存 Providers ======
                 var providers = CollectProviders();
@@ -616,6 +612,7 @@ namespace MochiBot.Src.UI
 
             config.Name = personNameBox.Text.Trim();
             config.Description = personDescBox.Text;
+            config.DisplayMode = (displayModeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Gif";
 
             config.ChatModels = _chatModels.ToList();
 

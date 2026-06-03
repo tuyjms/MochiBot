@@ -9,6 +9,9 @@
         /// <summary>子人格权重总和必须为此值</summary>
         public const int SubPersonalityWeightSum = 100;
 
+        /// <summary>有效的显示模式</summary>
+        public static readonly string[] ValidDisplayModes = { "Gif", "Vrm" };
+
         /// <summary>人物名称（仅允许中文、英文、数字、下划线，且不能以数字开头）</summary>
         public string Name { get; set; } = string.Empty;
 
@@ -43,6 +46,11 @@
 
         /// <summary>子人格列表</summary>
         public List<SubPersonality> Personalities { get; set; } = new();
+
+        /// <summary>
+        /// 桌宠显示模式："Gif"（2D 动图）或 "Vrm"（3D 模型）
+        /// </summary>
+        public string DisplayMode { get; set; } = "Gif";
     }
 
     /// <summary>
