@@ -134,7 +134,9 @@ namespace MochiBot.Src.UI
 
         private void OnFrameUpdated()
         {
-            System.Windows.Application.Current.Dispatcher.BeginInvoke(new Action(() => UpdateImage()));
+            var app = System.Windows.Application.Current;
+            if (app == null) return;
+            app.Dispatcher.BeginInvoke(new Action(() => UpdateImage()));
         }
 
         private void UpdateImage()

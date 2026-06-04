@@ -5,6 +5,7 @@ using System.Windows.Input;
 using MochiBot.Src.Core.Config;
 using MochiBot.Src.Core.Events;
 using MochiBot.Src.EventModels;
+using MochiBot.Src.Services;
 using static MochiBot.Src.Core.Constants;
 using EventTrigger1 = MochiBot.Src.EventModels.EventTrigger;
 
@@ -17,6 +18,7 @@ namespace MochiBot.Src.UI
     {
         private readonly IEventDispatcher _eventDispatcher;
         private readonly IConfigReader _configReader;
+        private readonly ChatHistoryRepository _chatHistoryRepo;
         private readonly ObservableCollection<ChatMessageItem> _messages = new();
         private string? _replySubscriptionId;
 
@@ -30,10 +32,11 @@ namespace MochiBot.Src.UI
         /// </summary>
         public event Action? NewAgentMessage;
 
-        public ChatWindow(IEventDispatcher eventDispatcher, IConfigReader configReader)
+        public ChatWindow(IEventDispatcher eventDispatcher, IConfigReader configReader, ChatHistoryRepository chatHistoryRepo)
         {
             _eventDispatcher = eventDispatcher;
             _configReader = configReader;
+            _chatHistoryRepo = chatHistoryRepo;
 
             InitializeComponent();
 
@@ -44,6 +47,9 @@ namespace MochiBot.Src.UI
 
             // 订阅 agent 回复事件
             SubscribeToReplyEvents();
+
+            // 从数据库加载历史聊天记录
+            _ = LoadHistoryAsync();
         }
 
         /// <summary>
@@ -186,6 +192,36 @@ namespace MochiBot.Src.UI
             if (e.ChangedButton == MouseButton.Left)
             {
                 DragMove();
+            }
+        }
+
+        /// <summary>
+        /// 从数据库加载历史聊天记录到 UI
+        /// </summary>
+        private async Task LoadHistoryAsync()
+        {
+            try
+            {
+                var history = await _chatHistoryRepo.LoadChatHistoryAsync(limit: 100);
+                if (history.Count == 0) return;
+
+                foreach (var msg in history)
+                {
+                    _messages.Add(new ChatMessageItem
+                    {
+                        Text = msg.Content,
+                        IsUser = msg.Role == ChatRoles.User,
+                        Alignment = msg.Role == ChatRoles.User
+                            ? HorizontalAlignment.Right
+                            : HorizontalAlignment.Left
+                    });
+                }
+
+                ScrollToBottom();
+            }
+            catch
+            {
+                // 加载历史失败不影响正常使用
             }
         }
 

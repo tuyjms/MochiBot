@@ -1,5 +1,6 @@
 using MochiBot.Src.Core.Config;
 using MochiBot.Src.EventModels;
+using MochiBot.Src.Services;
 
 namespace MochiBot.Src.Agent
 {
@@ -10,6 +11,7 @@ namespace MochiBot.Src.Agent
     public class MemoryCoordinator : IDisposable
     {
         private readonly IConfigReader _configReader;
+        private readonly ChatHistoryRepository? _chatHistoryRepo;
 
         /// <summary>短期记忆实例</summary>
         public IShortTermMemory ShortTermMemory { get; private set; }
@@ -28,9 +30,10 @@ namespace MochiBot.Src.Agent
         /// <param name="functionProvider">函数调用模型提供商</param>
         /// <param name="functionModel">函数调用模型名</param>
         /// <param name="configReader">配置读取器</param>
-        public MemoryCoordinator(string functionProvider, string functionModel, IConfigReader configReader)
+        public MemoryCoordinator(string functionProvider, string functionModel, IConfigReader configReader, ChatHistoryRepository? chatHistoryRepo = null)
         {
             _configReader = configReader ?? throw new ArgumentNullException(nameof(configReader));
+            _chatHistoryRepo = chatHistoryRepo;
 
             ShortTermMemory = CreateShortTermMemory(functionProvider, functionModel);
             LongMemory = new LongMemory(functionProvider, functionModel, configReader);
@@ -48,6 +51,9 @@ namespace MochiBot.Src.Agent
 
             // 初始化长期记忆计数
             _ = InitializeCountAsync();
+
+            // 从数据库预热短期记忆
+            _ = WarmUpFromDatabaseAsync();
         }
 
         /// <summary>
@@ -125,6 +131,9 @@ namespace MochiBot.Src.Agent
             ShortTermMemory = CreateShortTermMemory(functionProvider, functionModel);
             LongMemory = new LongMemory(functionProvider, functionModel, _configReader);
             _configReader.Logger.Info("[Memory] ProviderConfig 已变更，记忆模块已重建");
+
+            // 重建后重新预热
+            _ = WarmUpFromDatabaseAsync();
         }
 
         /// <summary>
@@ -134,6 +143,29 @@ namespace MochiBot.Src.Agent
         {
             ShortTermMemory.Capacity = capacity;
             _configReader.Logger.Info($"[Memory] 短期记忆容量已调整为: {capacity}");
+        }
+
+        /// <summary>从数据库预热短期记忆（启动时加载最近的聊天记录）</summary>
+        private async Task WarmUpFromDatabaseAsync()
+        {
+            if (_chatHistoryRepo == null) return;
+
+            try
+            {
+                var history = await _chatHistoryRepo.LoadChatHistoryAsync(limit: ShortTermMemory.Capacity);
+                if (history.Count == 0) return;
+
+                foreach (var msg in history)
+                {
+                    ShortTermMemory.AddMessage(msg.Role, msg.Content);
+                }
+
+                _configReader.Logger.Info($"[Memory] 从数据库预热短期记忆: {history.Count} 条消息");
+            }
+            catch (Exception ex)
+            {
+                _configReader.Logger.Warn($"[Memory] 从数据库预热短期记忆失败: {ex.Message}");
+            }
         }
 
         // ========== 私有方法 ==========

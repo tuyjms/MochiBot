@@ -75,7 +75,7 @@ namespace MochiBot.Src.UI
                 _avatarChar = characterName.Length > 0 ? characterName[..1] : "宠";
 
                 // 创建聊天窗口
-                _chatWindow = new ChatWindow(_eventDispatcher, _configReader);
+                _chatWindow = new ChatWindow(_eventDispatcher, _configReader, MochiBot.Program.ChatHistoryRepo!);
                 _chatWindow.NewAgentMessage += OnChatWindowNewMessage;
                 _chatWindow.Owner = this;
 

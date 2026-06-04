@@ -2,7 +2,9 @@ using System.IO;
 using MochiBot.Src.Agent;
 using MochiBot.Src.Core;
 using MochiBot.Src.Core.Config;
+using MochiBot.Src.Core.Database;
 using MochiBot.Src.Core.Events;
+using MochiBot.Src.Services;
 using MochiBot.Src.Services.Tool;
 
 namespace MochiBot
@@ -24,6 +26,11 @@ namespace MochiBot
         public static MainAgent? Agent { get; private set; }
 
         /// <summary>
+        /// 聊天记录仓库实例（供 ChatWindow 使用）
+        /// </summary>
+        public static ChatHistoryRepository? ChatHistoryRepo { get; private set; }
+
+        /// <summary>
         /// 初始化所有依赖（由 WPF 生成的 Main 调用）
         /// </summary>
         public static void Initialize()
@@ -37,12 +44,15 @@ namespace MochiBot
 
                 // 创建依赖（Agent 自管理 LlmClient 和 ShortTermMemory）
                 var toolService = new ToolService(configReader);
+                var databaseService = new DatabaseService();
+                ChatHistoryRepo = new ChatHistoryRepository(databaseService);
 
                 // 创建 Agent（传入同一个 EventDispatcher）
                 Agent = new MainAgent(
                     EventDispatcher,
                     configReader,
-                    toolService);
+                    toolService,
+                    ChatHistoryRepo);
 
                 // 启动事件调度器定时任务
                 EventDispatcher.StartScheduler();

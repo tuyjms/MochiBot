@@ -25,6 +25,20 @@ namespace MochiBot.Src.Services
                 : $"{connectionString};Pooling=False");
         }
 
+        /// <summary>追加单条消息到聊天历史（增量写入，不清空表）</summary>
+        public async Task SaveSingleMessageAsync(ChatMessage message)
+        {
+            await using var connection = CreateConnection();
+            await connection.OpenAsync();
+
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "INSERT INTO chat_history (Role, Content, Timestamp) VALUES (@Role, @Content, @Timestamp)";
+            cmd.Parameters.AddWithValue("@Role", message.Role);
+            cmd.Parameters.AddWithValue("@Content", message.Content);
+            cmd.Parameters.AddWithValue("@Timestamp", message.Timestamp.ToString("O"));
+            await cmd.ExecuteNonQueryAsync();
+        }
+
         /// <summary>保存聊天记录到历史</summary>
         public async Task SaveChatHistoryAsync(List<ChatMessage> messages)
         {

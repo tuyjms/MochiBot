@@ -137,6 +137,55 @@ public class DatabaseServiceTests : IDisposable
         Assert.Empty(loaded);
     }
 
+    [Fact]
+    public async Task SaveSingleMessage_ShouldAppendToExistingData()
+    {
+        // 先批量写入2条
+        var messages = new List<ChatMessage>
+        {
+            new() { Role = "user", Content = "第一条", Timestamp = new DateTime(2026, 1, 1, 10, 0, 0) },
+            new() { Role = "assistant", Content = "回复", Timestamp = new DateTime(2026, 1, 1, 10, 0, 5) }
+        };
+        await _chatHistoryRepo.SaveChatHistoryAsync(messages);
+
+        // 增量追加1条
+        await _chatHistoryRepo.SaveSingleMessageAsync(new ChatMessage
+        {
+            Role = "user",
+            Content = "增量消息",
+            Timestamp = new DateTime(2026, 1, 1, 10, 1, 0)
+        });
+
+        var loaded = await _chatHistoryRepo.LoadChatHistoryAsync(limit: 10);
+
+        Assert.Equal(3, loaded.Count);
+        Assert.Equal("第一条", loaded[0].Content);
+        Assert.Equal("回复", loaded[1].Content);
+        Assert.Equal("增量消息", loaded[2].Content);
+    }
+
+    [Fact]
+    public async Task SaveSingleMessage_Multiple_ShouldPreserveOrder()
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            await _chatHistoryRepo.SaveSingleMessageAsync(new ChatMessage
+            {
+                Role = i % 2 == 0 ? "user" : "assistant",
+                Content = $"消息{i}",
+                Timestamp = new DateTime(2026, 1, 1, 10, 0, i)
+            });
+        }
+
+        var loaded = await _chatHistoryRepo.LoadChatHistoryAsync(limit: 10);
+
+        Assert.Equal(5, loaded.Count);
+        for (int i = 0; i < 5; i++)
+        {
+            Assert.Equal($"消息{i}", loaded[i].Content);
+        }
+    }
+
     // ========== 情绪日志 ==========
 
     [Fact]

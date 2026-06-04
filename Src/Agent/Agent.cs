@@ -38,6 +38,7 @@ namespace MochiBot.Src.Agent
         private readonly EventProcessingQueue _eventQueue;
         private readonly AutoEventFilter _autoEventFilter;
         private readonly MemoryCoordinator _memoryCoordinator;
+        private readonly ChatHistoryRepository _chatHistoryRepo;
         private string _lastJsonError = string.Empty;
 
         private string _functionProviderName = string.Empty;
@@ -47,11 +48,13 @@ namespace MochiBot.Src.Agent
             IEventDispatcher eventDispatcher,
             IConfigReader configReader,
             IToolService toolService,
+            ChatHistoryRepository chatHistoryRepo,
             MoodLogRepository? moodLogRepository = null)
         {
             _eventDispatcher = eventDispatcher ?? throw new ArgumentNullException(nameof(eventDispatcher));
             _configReader = configReader ?? throw new ArgumentNullException(nameof(configReader));
             _toolService = toolService ?? throw new ArgumentNullException(nameof(toolService));
+            _chatHistoryRepo = chatHistoryRepo ?? throw new ArgumentNullException(nameof(chatHistoryRepo));
             _moodManager = new MoodManager(eventDispatcher, moodLogRepository);
 
             _appSettings = configReader.GetAppSettings();
@@ -282,7 +285,7 @@ namespace MochiBot.Src.Agent
             try
             {
                 // 内置任务过滤：活动记录 + 碎碎念短路 + 条件检查
-                var filterResult = _autoEventFilter.Update(eventData);
+                var filterResult = await _autoEventFilter.UpdateAsync(eventData);
                 if (filterResult != AutoEventResult.Continue)
                     return;
 
@@ -328,6 +331,14 @@ namespace MochiBot.Src.Agent
         {
             // 1. 记录用户消息到短期记忆
             _memoryCoordinator.ShortTermMemory.AddMessage(ChatRoles.User, userMessage);
+
+            // 持久化用户消息到 SQLite
+            _ = _chatHistoryRepo.SaveSingleMessageAsync(new ChatMessage
+            {
+                Role = ChatRoles.User,
+                Content = userMessage,
+                Timestamp = DateTime.Now
+            });
 
             // 检查是否需要触发短期记忆总结
             await _memoryCoordinator.CheckAndSummarizeIfNeededAsync();
@@ -406,6 +417,14 @@ namespace MochiBot.Src.Agent
             if (!string.IsNullOrEmpty(reply))
             {
                 _memoryCoordinator.ShortTermMemory.AddMessage(ChatRoles.Assistant, reply);
+
+                // 持久化助手回复到 SQLite
+                _ = _chatHistoryRepo.SaveSingleMessageAsync(new ChatMessage
+                {
+                    Role = ChatRoles.Assistant,
+                    Content = reply,
+                    Timestamp = DateTime.Now
+                });
 
                 // 发布回复事件，供 UI 订阅显示
                 _eventDispatcher.Publish(new EventData
