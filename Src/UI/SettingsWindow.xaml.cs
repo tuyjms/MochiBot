@@ -202,7 +202,10 @@ namespace MochiBot.Src.UI
 
             try
             {
-                var oldUserName = _configReader.GetAppSettings().UserName;
+                // 保存前快照（用于变更检测）
+                var oldAppSettings = _configReader.GetAppSettings();
+                var oldProviders = _configReader.GetAllProviders();
+                var oldModuleSettings = _configReader.GetModuleSettings();
 
                 // ====== 1. 保存 AppSettings ======
                 var appSettings = _configReader.GetAppSettings();
@@ -242,7 +245,8 @@ namespace MochiBot.Src.UI
                 }
 
                 // ====== 3. 保存 Providers ======
-                _configReader.SaveProviders(_providerTab.Collect());
+                var newProviders = _providerTab.Collect();
+                _configReader.SaveProviders(newProviders);
 
                 // ====== 4. 保存 ModuleSettings ======
                 _configReader.SaveModuleSettings(newModuleSettings);
@@ -250,9 +254,27 @@ namespace MochiBot.Src.UI
                 // ====== 5. 保存人格配置 ======
                 _personalityTab.SaveCurrent();
 
-                // ====== 发布事件 ======
+                // ====== 变更检测 ======
                 var changedItems = new List<string>();
-                if (oldUserName != appSettings.UserName) changedItems.Add("UserName");
+
+                // AppSettings 字段变更
+                if (oldAppSettings.UserName != appSettings.UserName) changedItems.Add("UserName");
+                if (oldAppSettings.ActivePersonality != appSettings.ActivePersonality) changedItems.Add("ActivePersonality");
+                if (oldAppSettings.EnableStructuredResponse != appSettings.EnableStructuredResponse) changedItems.Add("EnableStructuredResponse");
+                if (oldAppSettings.EnableMidTermMemoryOnChat != appSettings.EnableMidTermMemoryOnChat) changedItems.Add("EnableMidTermMemoryOnChat");
+                if (oldAppSettings.EnableLongTermRecall != appSettings.EnableLongTermRecall) changedItems.Add("EnableLongTermRecall");
+                if (oldAppSettings.MaxActionsPerResponse != appSettings.MaxActionsPerResponse) changedItems.Add("MaxActionsPerResponse");
+
+                // Provider 配置变更（序列化比较）
+                if (System.Text.Json.JsonSerializer.Serialize(oldProviders) != System.Text.Json.JsonSerializer.Serialize(newProviders))
+                    changedItems.Add("ProviderConfig");
+
+                // 模块参数变更（序列化比较）
+                if (System.Text.Json.JsonSerializer.Serialize(oldModuleSettings) != System.Text.Json.JsonSerializer.Serialize(newModuleSettings))
+                    changedItems.Add("ModuleSettings");
+
+                // 人格配置变更（SaveCurrent 总是写文件，保守标记为已变更）
+                changedItems.Add("PersonalityConfig");
 
                 _eventDispatcher.Publish(new EventData
                 {

@@ -46,13 +46,15 @@ namespace MochiBot
                 var toolService = new ToolService(configReader);
                 var databaseService = new DatabaseService();
                 ChatHistoryRepo = new ChatHistoryRepository(databaseService);
+                var moodLogRepo = new MoodLogRepository(databaseService);
 
                 // 创建 Agent（传入同一个 EventDispatcher）
                 Agent = new MainAgent(
                     EventDispatcher,
                     configReader,
                     toolService,
-                    ChatHistoryRepo);
+                    ChatHistoryRepo,
+                    moodLogRepo);
 
                 // 启动事件调度器定时任务
                 EventDispatcher.StartScheduler();

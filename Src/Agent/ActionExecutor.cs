@@ -269,7 +269,9 @@ namespace MochiBot.Src.Agent
 
         private void HandleMoodChange(AgentAction action)
         {
-            if (Enum.TryParse<AgentMood>(action.Mood, true, out var mood))
+            // LLM 可能将情绪值放在 Mood 或 Name 字段
+            var moodStr = action.Mood ?? action.Name;
+            if (Enum.TryParse<AgentMood>(moodStr, true, out var mood))
             {
                 _onMoodChange(mood);
             }

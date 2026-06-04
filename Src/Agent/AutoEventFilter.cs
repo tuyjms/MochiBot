@@ -52,7 +52,7 @@ namespace MochiBot.Src.Agent
         /// <summary>
         /// 统一入口：记录活动 + 内置任务短路 + 条件检查
         /// </summary>
-        public AutoEventResult Update(EventData eventData)
+        public async Task<AutoEventResult> UpdateAsync(EventData eventData)
         {
             // 用户输入时记录活动时间
             if (eventData.Category == EventCategory.UserInput)
@@ -65,7 +65,7 @@ namespace MochiBot.Src.Agent
                 return AutoEventResult.Continue;
 
             // 碎碎念：按权重随机决定走 LLM 还是内置文本
-            if (TryHandleMurmur(eventData))
+            if (await TryHandleMurmurAsync(eventData))
                 return AutoEventResult.Handled;
 
             // 用眼提醒/空闲检测：条件不满足则跳过
@@ -80,7 +80,7 @@ namespace MochiBot.Src.Agent
         /// 根据权重和随机决定使用内置文本还是 LLM 生成回复
         /// </summary>
         /// <returns>true 表示已处理（无需继续处理），false 表示不是碎碎念事件或决定走 LLM</returns>
-        public bool TryHandleMurmur(EventData eventData)
+        public async Task<bool> TryHandleMurmurAsync(EventData eventData)
         {
             try
             {
@@ -108,7 +108,7 @@ namespace MochiBot.Src.Agent
                 }
 
                 // 使用内置碎碎念文本（通过 ToolService 统一工具接口）
-                var result = _toolService.ExecuteToolAsync(Tools.Murmur, "{}").GetAwaiter().GetResult();
+                var result = await _toolService.ExecuteToolAsync(Tools.Murmur, "{}");
                 if (result.Success)
                 {
                     using var resultDoc = JsonDocument.Parse(result.Data);

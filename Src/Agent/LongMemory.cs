@@ -48,8 +48,8 @@ namespace MochiBot.Src.Agent
             var maxEntries = _configReader.GetModuleSettings().LongTermMemory_MaxEntries;
             if (count >= maxEntries)
             {
-                // 淘汰最不重要的条目
-                await EvictEntriesAsync(0, 90);
+                // 淘汰最不重要的条目（importance < 10 且超过 90 天未访问）
+                await EvictEntriesAsync(10, 90);
             }
 
             var model = new LongMemoryEntryModel

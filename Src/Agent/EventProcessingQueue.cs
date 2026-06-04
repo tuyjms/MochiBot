@@ -99,6 +99,13 @@ namespace MochiBot.Src.Agent
             {
                 _processLock.Release();
             }
+
+            // 修复竞态：释放锁后重新检查队列，处理在 TryDequeue 和 Release 之间入队的事件
+            // 此时 EnqueueEventAsync 的 TryStartProcessing 可能因锁未释放而跳过
+            if (!_eventQueue.IsEmpty)
+            {
+                TryStartProcessing();
+            }
         }
 
         /// <summary>设置 Agent 状态并上报到 EventDispatcher</summary>

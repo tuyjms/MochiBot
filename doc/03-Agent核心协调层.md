@@ -42,14 +42,18 @@ Agent 是系统的**大脑**和，负责协调所有子模块。它订阅事件�
 
 1. 事件调度器分发 UserInput 事件
 2. Agent 接收事件，短期记忆.AddMessage("user", message)
-3. 构建完整 Prompt（含长期记忆检索）
-4. LlmClient.SendChatAsync() 对话模式调用
-5. 解析 LLM 响应：提取 reply 文本 + 解析 actions 数组
-6. 遍历执行 actions：tool_call → ToolService、mood_change → SetMood()、animation → Renderer
-7. 短期记忆.AddMessage("assistant", reply)
-8. 检查短期记忆是否溢出，溢出时调用函数模式评估重要度后录入 LongMemory
-9. 根据用户消息关键词和时间自动检测情绪变化（DetectAndTriggerMoodEvent）
-10. 返回 reply
+3. **ChatHistoryRepository.SaveSingleMessageAsync(User)** — 实时持久化到 SQLite
+4. 构建完整 Prompt（含长期记忆检索）
+5. LlmClient.SendChatAsync() 对话模式调用
+6. 解析 LLM 响应：提取 reply 文本 + 解析 actions 数组
+7. 遍历执行 actions：tool_call → ToolService、mood_change → SetMood()、animation → Renderer
+8. 短期记忆.AddMessage("assistant", reply)
+9. **ChatHistoryRepository.SaveSingleMessageAsync(Assistant)** — 实时持久化到 SQLite
+10. 检查短期记忆是否溢出，溢出时调用函数模式评估重要度后录入 LongMemory
+11. 根据用户消息关键词和时间自动检测情绪变化（DetectAndTriggerMoodEvent）
+12. 返回 reply
+
+> **启动恢复**：应用重启时，`MemoryCoordinator.WarmUpFromDatabaseAsync` 从 SQLite 加载最近消息预热 ShortTermMemory，`ChatWindow.LoadHistoryAsync` 恢复 UI 消息列表。
 
 ### 2. 处理自动事件
 
@@ -69,11 +73,7 @@ Agent 是系统的**大脑**和，负责协调所有子模块。它订阅事件�
 
 ## 依赖关系
 
-Agent 依赖：LlmClient, PromptFormatter, ShortTermMemory, LongMemory, ToolService, ICharacterRenderer, IDatabaseService
-
-**不依赖**：IAgentMoodTracker（已内联到 Agent 内部）
-
-依赖 Agent：Form1（UI层）, EventDispatcher（定时任务）
+Agent 依赖：LlmClient, PromptBuilder, ShortTermMemory, LongMemory, ToolService, ChatHistoryRepository, EventDispatcher, MoodLogRepository
 
 ## 关于单元测试
 
