@@ -186,25 +186,6 @@ namespace MochiBot.Src.UI
             _ownerWindow.SetPassthrough(passthroughCheck.IsChecked == true);
         }
 
-        // ==================== 调试 ====================
-
-        private void TestScreenshot_Click(object sender, RoutedEventArgs e)
-        {
-            var path = ScreenshotService.DebugCaptureToFile(_configReader);
-            if (path != null)
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = path,
-                    UseShellExecute = true
-                });
-            }
-            else
-            {
-                MessageBox.Show("截图失败，请查看日志", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
         // ==================== 保存 ====================
 
         private async void SaveButton_Click(object sender, RoutedEventArgs e)
