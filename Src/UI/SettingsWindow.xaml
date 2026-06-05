@@ -99,7 +99,9 @@
                         <Label Content="视觉功能" FontSize="13" FontWeight="SemiBold" Margin="0,6,0,2"/>
                         <CheckBox x:Name="autoScreenshotOnChatCheck" Content="聊天时自动截图" FontSize="13" Margin="0,2"/>
                         <CheckBox x:Name="screenshotOnLateNightCheck" Content="深夜关怀时截图" FontSize="13" Margin="0,2"/>
-                        <CheckBox x:Name="screenshotOnEyeRestCheck" Content="用眼提醒时截图" FontSize="13" Margin="0,2,0,10"/>
+                        <CheckBox x:Name="screenshotOnEyeRestCheck" Content="用眼提醒时截图" FontSize="13" Margin="0,2"/>
+                        <Button Content="测试截图" Width="80" Height="26" FontSize="12" Margin="0,4,0,10"
+                                HorizontalAlignment="Left" Click="TestScreenshot_Click"/>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
