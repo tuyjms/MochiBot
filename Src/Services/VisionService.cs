@@ -32,7 +32,7 @@ namespace MochiBot.Src.Services
                 var modelFullName = personality.VisionModels[0];
                 var (provider, model) = ParseModelName(modelFullName);
 
-                _visionLlmClient = new LlmClient(provider, model, configReader, supportsVision: true);
+                _visionLlmClient = new LlmClient(provider, model, configReader);
                 _isAvailable = true;
                 configReader.Logger.Info($"[VisionService] 已初始化视觉模型: {provider}/{model}");
             }

@@ -15,16 +15,18 @@ namespace MochiBot.Src.Services
         /// <summary>该模型是否支持视觉输入（图片）</summary>
         public bool SupportsVision { get; }
 
-        public LlmClient(string provider,string model,IConfigReader configReader,bool supportsVision = false)
+        public LlmClient(string provider,string model,IConfigReader configReader)
         {
             _configReader = configReader;
             _providers = _configReader.GetAllProviders();;
-            SupportsVision = supportsVision;
 
             if (!_providers.TryGetValue(provider, out var config))
             {throw new ArgumentException($"Provider '{provider}' not found in configuration.");}
 
             _currentProviderConfig = config;
+
+            // 从模型注册表读取视觉标识
+            SupportsVision = config.Models?.FirstOrDefault(m => m.Name == model)?.SupportsVision ?? false;
 
             var client = new OpenAI.OpenAIClient(new System.ClientModel.ApiKeyCredential(config.ApiKey), new OpenAI.OpenAIClientOptions
             {Endpoint = new Uri(config.BaseUrl), NetworkTimeout = TimeSpan.FromSeconds(config.TimeoutSeconds)});

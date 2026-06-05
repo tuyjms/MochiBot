@@ -31,5 +31,8 @@
 
         /// <summary>重试基础延迟（毫秒），默认 1000，指数退避</summary>
         public int RetryDelayMs { get; set; } = 1000;
+
+        /// <summary>该提供商下注册的模型列表（供 LlmClient 查找模型参数和视觉标识）</summary>
+        public List<ModelConfig> Models { get; set; } = new();
     }
 }
