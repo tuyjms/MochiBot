@@ -21,12 +21,16 @@ namespace MochiBot.Src.UI.Settings
         private readonly ComboBox _modelProviderBox;
         private readonly ComboBox _modelNameBox;
         private readonly ListBox _chatModelsList;
+        private readonly ComboBox _visionProviderBox;
+        private readonly ComboBox _visionModelBox;
+        private readonly ListBox _visionModelsList;
         private readonly DataGrid _subPersonalitiesGrid;
         private readonly TextBlock _weightSumLabel;
         private readonly ComboBox _activePersonalityBox;
 
         // 数据源
         private ObservableCollection<string> _chatModels = new();
+        private ObservableCollection<string> _visionModels = new();
         private ObservableCollection<SubPersonalityViewModel> _subPersonalities = new();
         private Dictionary<string, PersonalityConfig> _personalityCache = new();
         private string? _currentPersonalityName;
@@ -40,6 +44,9 @@ namespace MochiBot.Src.UI.Settings
             ComboBox modelProviderBox,
             ComboBox modelNameBox,
             ListBox chatModelsList,
+            ComboBox visionProviderBox,
+            ComboBox visionModelBox,
+            ListBox visionModelsList,
             DataGrid subPersonalitiesGrid,
             TextBlock weightSumLabel,
             ComboBox activePersonalityBox)
@@ -52,6 +59,9 @@ namespace MochiBot.Src.UI.Settings
             _modelProviderBox = modelProviderBox;
             _modelNameBox = modelNameBox;
             _chatModelsList = chatModelsList;
+            _visionProviderBox = visionProviderBox;
+            _visionModelBox = visionModelBox;
+            _visionModelsList = visionModelsList;
             _subPersonalitiesGrid = subPersonalitiesGrid;
             _weightSumLabel = weightSumLabel;
             _activePersonalityBox = activePersonalityBox;
@@ -68,6 +78,10 @@ namespace MochiBot.Src.UI.Settings
             _modelProviderBox.ItemsSource = _configReader.GetAvailableProviders().ToList();
             if (_modelProviderBox.Items.Count > 0)
                 _modelProviderBox.SelectedIndex = 0;
+
+            _visionProviderBox.ItemsSource = _configReader.GetAvailableProviders().ToList();
+            if (_visionProviderBox.Items.Count > 0)
+                _visionProviderBox.SelectedIndex = 0;
 
             _personalityCache.Clear();
             foreach (var name in personalities)
@@ -99,6 +113,9 @@ namespace MochiBot.Src.UI.Settings
 
                 _chatModels = new ObservableCollection<string>(config.ChatModels ?? new List<string>());
                 _chatModelsList.ItemsSource = _chatModels;
+
+                _visionModels = new ObservableCollection<string>(config.VisionModels ?? new List<string>());
+                _visionModelsList.ItemsSource = _visionModels;
 
                 _subPersonalities = new ObservableCollection<SubPersonalityViewModel>(
                     (config.Personalities ?? new List<SubPersonality>()).Select(s =>
@@ -156,6 +173,54 @@ namespace MochiBot.Src.UI.Settings
         {
             if (_chatModelsList.SelectedItem is string selected)
                 _chatModels.Remove(selected);
+        }
+
+        /// <summary>视觉模型提供商切换时，加载模型列表</summary>
+        public void OnVisionProviderChanged()
+        {
+            var provider = _visionProviderBox.SelectedItem?.ToString();
+            if (string.IsNullOrEmpty(provider)) return;
+
+            var providerConfig = _configReader.GetProvider(provider);
+            var models = providerConfig?.Models?
+                .Where(m => !string.IsNullOrWhiteSpace(m.Name))
+                .Select(m => m.Name)
+                .ToList() ?? new List<string>();
+
+            _visionModelBox.ItemsSource = models;
+            if (models.Count > 0)
+                _visionModelBox.SelectedIndex = 0;
+            else
+                _visionModelBox.ItemsSource = null;
+        }
+
+        public void AddVisionModel()
+        {
+            var provider = _visionProviderBox.SelectedItem?.ToString()?.Trim();
+            var model = _visionModelBox.SelectedItem?.ToString()?.Trim();
+            if (string.IsNullOrEmpty(provider))
+            {
+                MessageBox.Show("请先选择一个提供商", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if (string.IsNullOrEmpty(model))
+            {
+                MessageBox.Show("请先选择一个模型", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            var fullName = $"{provider}/{model}";
+            if (_visionModels.Contains(fullName))
+            {
+                MessageBox.Show($"模型 \"{fullName}\" 已存在", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            _visionModels.Add(fullName);
+        }
+
+        public void RemoveVisionModel()
+        {
+            if (_visionModelsList.SelectedItem is string selected)
+                _visionModels.Remove(selected);
         }
 
         public void AddSubPersonality()
@@ -256,6 +321,7 @@ namespace MochiBot.Src.UI.Settings
             config.Description = _personDescBox.Text;
             config.DisplayMode = (_displayModeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Gif";
             config.ChatModels = _chatModels.ToList();
+            config.VisionModels = _visionModels.Count > 0 ? _visionModels.ToList() : null;
             config.Personalities = _subPersonalities.Select(s => new SubPersonality
             {
                 Name = s.Name,

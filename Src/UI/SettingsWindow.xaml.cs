@@ -47,6 +47,7 @@ namespace MochiBot.Src.UI
                 _configReader,
                 personalitySelector, personNameBox, personDescBox, displayModeBox,
                 modelProviderBox, modelNameBox, chatModelsList,
+                visionProviderBox, visionModelBox, visionModelsList,
                 subPersonalitiesGrid, weightSumLabel, activePersonalityBox);
             _moduleTab = new ModuleSettingsTabController(
                 _configReader,
@@ -143,6 +144,15 @@ namespace MochiBot.Src.UI
 
         private void RemoveChatModel_Click(object sender, RoutedEventArgs e)
             => _personalityTab.RemoveChatModel();
+
+        private void VisionProviderBox_Changed(object sender, SelectionChangedEventArgs e)
+            => _personalityTab.OnVisionProviderChanged();
+
+        private void AddVisionModel_Click(object sender, RoutedEventArgs e)
+            => _personalityTab.AddVisionModel();
+
+        private void RemoveVisionModel_Click(object sender, RoutedEventArgs e)
+            => _personalityTab.RemoveVisionModel();
 
         private void AddSubPersonality_Click(object sender, RoutedEventArgs e)
             => _personalityTab.AddSubPersonality();
