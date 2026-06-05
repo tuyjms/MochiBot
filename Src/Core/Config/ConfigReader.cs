@@ -77,7 +77,7 @@ namespace MochiBot.Src.Core.Config
                 GenerateDefaultConfig();
             }
 
-            var json = File.ReadAllText(_configPath);
+            var json = ReadAllTextWithRetry(_configPath);
             _cachedDoc = JsonDocument.Parse(json);
             _cachedAppConfig = null;
             _cachedModuleSettings = null;
@@ -123,7 +123,7 @@ namespace MochiBot.Src.Core.Config
 
             var options = new JsonSerializerOptions { WriteIndented = true };
             var json = JsonSerializer.Serialize(defaultConfig, options);
-            File.WriteAllText(_configPath, json);
+            WriteAllTextWithRetry(_configPath, json);
             _logger.Info($"配置文件不存在，已生成默认配置: {_configPath}");
         }
 
@@ -238,7 +238,7 @@ namespace MochiBot.Src.Core.Config
 
             try
             {
-                var json = File.ReadAllText(filePath);
+                var json = ReadAllTextWithRetry(filePath);
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
                 var config = JsonSerializer.Deserialize<PersonalityConfig>(json, options);
                 return config;
@@ -291,7 +291,7 @@ namespace MochiBot.Src.Core.Config
         {
             try
             {
-                var json = File.ReadAllText(_configPath);
+                var json = ReadAllTextWithRetry(_configPath);
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
@@ -311,7 +311,7 @@ namespace MochiBot.Src.Core.Config
                 }
 
                 var newJson = JsonSerializer.Serialize(dict, options);
-                File.WriteAllText(_configPath, newJson);
+                WriteAllTextWithRetry(_configPath, newJson);
 
                 Reload();
                 Logger.Info("[ConfigReader] 应用设置已保存");
@@ -340,7 +340,7 @@ namespace MochiBot.Src.Core.Config
         {
             try
             {
-                var json = File.ReadAllText(_configPath);
+                var json = ReadAllTextWithRetry(_configPath);
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
@@ -360,7 +360,7 @@ namespace MochiBot.Src.Core.Config
                 }
 
                 var newJson = JsonSerializer.Serialize(dict, options);
-                File.WriteAllText(_configPath, newJson);
+                WriteAllTextWithRetry(_configPath, newJson);
 
                 Reload();
                 Logger.Info("[ConfigReader] 提供商配置已保存");
@@ -379,7 +379,7 @@ namespace MochiBot.Src.Core.Config
         {
             try
             {
-                var json = File.ReadAllText(_configPath);
+                var json = ReadAllTextWithRetry(_configPath);
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
@@ -399,7 +399,7 @@ namespace MochiBot.Src.Core.Config
                 }
 
                 var newJson = JsonSerializer.Serialize(dict, options);
-                File.WriteAllText(_configPath, newJson);
+                WriteAllTextWithRetry(_configPath, newJson);
 
                 Reload();
                 Logger.Info("[ConfigReader] 模块参数配置已保存");
@@ -432,7 +432,7 @@ namespace MochiBot.Src.Core.Config
 
                 var options = new JsonSerializerOptions { WriteIndented = true };
                 var json = JsonSerializer.Serialize(config, options);
-                File.WriteAllText(filePath, json);
+                WriteAllTextWithRetry(filePath, json);
 
                 // 如果保存的是当前激活的人格，清除缓存以触发重新加载
                 if (_cachedAppConfig?.Settings.ActivePersonality == personalityName)
@@ -743,6 +743,28 @@ namespace MochiBot.Src.Core.Config
         }
 
         // ========== IDisposable ==========
+
+        /// <summary>带重试的文件读取，解决多个 Save 方法快速连续操作同一文件时的 IOException</summary>
+        private static string ReadAllTextWithRetry(string path, int retries = 3, int delayMs = 50)
+        {
+            for (int i = 0; i < retries; i++)
+            {
+                try { return File.ReadAllText(path); }
+                catch (IOException) when (i < retries - 1) { Thread.Sleep(delayMs); }
+            }
+            return File.ReadAllText(path); // 最后一次不捕获，让异常抛出
+        }
+
+        /// <summary>带重试的文件写入</summary>
+        private static void WriteAllTextWithRetry(string path, string content, int retries = 3, int delayMs = 50)
+        {
+            for (int i = 0; i < retries; i++)
+            {
+                try { File.WriteAllText(path, content); return; }
+                catch (IOException) when (i < retries - 1) { Thread.Sleep(delayMs); }
+            }
+            File.WriteAllText(path, content);
+        }
 
         public void Dispose()
         {
