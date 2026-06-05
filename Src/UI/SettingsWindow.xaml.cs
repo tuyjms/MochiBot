@@ -119,6 +119,12 @@ namespace MochiBot.Src.UI
             logToFileCheck.IsChecked = appSettings.LogToFile;
             logToConsoleCheck.IsChecked = appSettings.LogToConsole;
 
+            // 视觉功能
+            var moduleSettings = _configReader.GetModuleSettings();
+            autoScreenshotOnChatCheck.IsChecked = moduleSettings.Vision_AutoScreenshotOnChat;
+            screenshotOnLateNightCheck.IsChecked = moduleSettings.Vision_ScreenshotOnLateNight;
+            screenshotOnEyeRestCheck.IsChecked = moduleSettings.Vision_ScreenshotOnEyeRest;
+
             // === Tab 2~4: 委托给控制器 ===
             _providerTab.Load();
             _personalityTab.Load(appSettings.ActivePersonality);
@@ -196,6 +202,11 @@ namespace MochiBot.Src.UI
 
             if (!_moduleTab.TryCollect(out var newModuleSettings))
                 return;
+
+            // Tab 1 中的视觉功能设置（不在 ModuleSettingsTabController 管辖范围内）
+            newModuleSettings.Vision_AutoScreenshotOnChat = autoScreenshotOnChatCheck.IsChecked == true;
+            newModuleSettings.Vision_ScreenshotOnLateNight = screenshotOnLateNightCheck.IsChecked == true;
+            newModuleSettings.Vision_ScreenshotOnEyeRest = screenshotOnEyeRestCheck.IsChecked == true;
 
             if (!_personalityTab.ValidateWeightSum())
                 return;

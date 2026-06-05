@@ -77,5 +77,19 @@
             "那个…我可以一直待在你身边吗？",
             "嘿嘿，你今天的笑容特别好看～"
         };
+
+        // ========== 视觉功能 ==========
+
+        /// <summary>已阅读截图声明（启动时检查，未阅读则弹窗）</summary>
+        public bool Vision_ScreenshotConsent { get; set; } = false;
+
+        /// <summary>聊天消息时是否自动截图</summary>
+        public bool Vision_AutoScreenshotOnChat { get; set; } = true;
+
+        /// <summary>深夜关怀事件时是否截图</summary>
+        public bool Vision_ScreenshotOnLateNight { get; set; } = true;
+
+        /// <summary>用眼提醒事件时是否截图</summary>
+        public bool Vision_ScreenshotOnEyeRest { get; set; } = false;
     }
 }

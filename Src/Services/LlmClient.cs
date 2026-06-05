@@ -12,10 +12,14 @@ namespace MochiBot.Src.Services
         private readonly ProviderConfig _currentProviderConfig;
         private ChatClient _chatClient;
 
-        public LlmClient(string provider,string model,IConfigReader configReader)
+        /// <summary>该模型是否支持视觉输入（图片）</summary>
+        public bool SupportsVision { get; }
+
+        public LlmClient(string provider,string model,IConfigReader configReader,bool supportsVision = false)
         {
             _configReader = configReader;
             _providers = _configReader.GetAllProviders();;
+            SupportsVision = supportsVision;
 
             if (!_providers.TryGetValue(provider, out var config))
             {throw new ArgumentException($"Provider '{provider}' not found in configuration.");}
@@ -65,6 +69,18 @@ namespace MochiBot.Src.Services
 
             throw new InvalidOperationException(
                 $"[LlmClient] {maxRetries + 1} 次尝试均失败，最后错误: {lastException?.Message}", lastException);
+        }
+
+        /// <summary>发送包含图片的多模态消息（供 VisionService 调用）</summary>
+        public virtual async Task<string> SendVisionAsync(string textPrompt, byte[] imageBytes)
+        {
+            var parts = new List<ChatMessageContentPart>
+            {
+                ChatMessageContentPart.CreateTextPart(textPrompt),
+                ChatMessageContentPart.CreateImagePart(System.BinaryData.FromBytes(imageBytes), "image/png")
+            };
+            var messages = new List<ChatMessage> { new UserChatMessage(parts) };
+            return await CallLlmAsync(messages);
         }
 
         /// <summary>实际的 LLM 调用（可被子类重写以模拟网络行为）</summary>

@@ -20,6 +20,16 @@ namespace MochiBot.Src.UI
             var databaseService = new DatabaseService();
             var userConfigRepository = new UserConfigRepository(databaseService);
 
+            // 截图声明检查：首次启动时弹出声明对话框
+            var moduleSettings = configReader.GetModuleSettings();
+            if (!moduleSettings.Vision_ScreenshotConsent)
+            {
+                var consentDialog = new ScreenshotConsentDialog();
+                consentDialog.ShowDialog();
+                moduleSettings.Vision_ScreenshotConsent = consentDialog.UserConsented;
+                configReader.SaveModuleSettings(moduleSettings);
+            }
+
             // 创建 MainWindow 并传入依赖
             var mainWindow = new MainWindow(Program.EventDispatcher, configReader, userConfigRepository);
             mainWindow.Show();

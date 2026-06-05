@@ -37,6 +37,7 @@ namespace MochiBot.Src.Agent
         private readonly PromptBuilder _promptBuilder;
         private readonly EventProcessingQueue _eventQueue;
         private readonly AutoEventFilter _autoEventFilter;
+        private readonly VisionService _visionService;
         private readonly MemoryCoordinator _memoryCoordinator;
         private readonly ChatHistoryRepository _chatHistoryRepo;
         private string _lastJsonError = string.Empty;
@@ -77,6 +78,9 @@ namespace MochiBot.Src.Agent
                 _toolService,
                 (role, content) => _memoryCoordinator.ShortTermMemory.AddMessage(role, content),
                 evt => _eventDispatcher.Publish(evt));
+
+            // 创建视觉服务（截图 → VisionModel → 文字描述）
+            _visionService = new VisionService(configReader);
 
             // 创建事件处理队列（实际处理逻辑委托给 ProcessEventInternalAsync）
             _eventQueue = new EventProcessingQueue(_eventDispatcher, _configReader, ProcessEventInternalAsync);
@@ -306,7 +310,16 @@ namespace MochiBot.Src.Agent
                         return;
                 }
 
-                await ProcessWithLlmAsync(eventData, userMessage);
+                // ===== 视觉注入：截图 → VisionModel → 文字描述 =====
+                // screenDescription 不混入 userMessage，避免进入记忆系统和聊天历史
+                string? screenDescription = null;
+                var visionSettings = _configReader.GetModuleSettings();
+                if (ScreenshotPolicy.ShouldCapture(eventData, visionSettings))
+                {
+                    screenDescription = await _visionService.TryDescribeScreenAsync();
+                }
+
+                await ProcessWithLlmAsync(eventData, userMessage, screenDescription);
 
                 // 更新情绪（根据用户交互内容和时间自动判断）
                 if (eventData.Category == EventCategory.UserInput)
@@ -327,12 +340,12 @@ namespace MochiBot.Src.Agent
         private const int MaxToolLoopIterations = 5;
 
         /// <summary>使用 LLM 处理事件（含工具调用循环）</summary>
-        private async Task ProcessWithLlmAsync(EventData eventData, string userMessage)
+        private async Task ProcessWithLlmAsync(EventData eventData, string userMessage, string? screenDescription = null)
         {
-            // 1. 记录用户消息到短期记忆
+            // 1. 记录原始用户消息到短期记忆（不含截图描述）
             _memoryCoordinator.ShortTermMemory.AddMessage(ChatRoles.User, userMessage);
 
-            // 持久化用户消息到 SQLite
+            // 持久化原始用户消息到 SQLite
             _ = _chatHistoryRepo.SaveSingleMessageAsync(new ChatMessage
             {
                 Role = ChatRoles.User,
@@ -342,6 +355,13 @@ namespace MochiBot.Src.Agent
 
             // 检查是否需要触发短期记忆总结
             await _memoryCoordinator.CheckAndSummarizeIfNeededAsync();
+
+            // 如果有截图描述，拼接到送给 LLM 的消息中（不影响记忆和历史）
+            var llmMessage = userMessage;
+            if (!string.IsNullOrEmpty(screenDescription))
+            {
+                llmMessage = $"【用户屏幕画面】{screenDescription}\n\n{userMessage}";
+            }
 
             // 2. 构建系统 Prompt（循环内不变）
             var systemPrompt = _promptBuilder.BuildSystemPrompt(
@@ -360,7 +380,7 @@ namespace MochiBot.Src.Agent
                 var recentMessages = _memoryCoordinator.ShortTermMemory.GetRecentMessages(10);
                 var shortTermStr = string.Join("\n", recentMessages.Select(m => $"[{m.Role}] {m.Content}"));
                 var userContext = _promptBuilder.BuildUserContext(
-                    userMessage, longTermStr, shortTermStr, _lastJsonError);
+                    llmMessage, longTermStr, shortTermStr, _lastJsonError);
 
                 // 3b. 调用 LLM
                 var messages = new List<ChatMessage>
