@@ -535,6 +535,22 @@ namespace MochiBot.Src.Core.Config
                         BaseUrl = prop.Value.TryGetProperty("BaseUrl", out var baseUrl) ? baseUrl.GetString() ?? "" : "",
                         ContextLimit = prop.Value.TryGetProperty("ContextLimit", out var ctxLimit) ? ctxLimit.GetInt32() : 4096
                     };
+
+                    // 解析 Models 数组
+                    if (prop.Value.TryGetProperty("Models", out var modelsElement) && modelsElement.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var modelEl in modelsElement.EnumerateArray())
+                        {
+                            var mc = new Models.ModelConfig();
+                            if (modelEl.TryGetProperty("Name", out var nameProp))
+                                mc.Name = nameProp.GetString() ?? "";
+                            if (modelEl.TryGetProperty("SupportsVision", out var svProp))
+                                mc.SupportsVision = svProp.GetBoolean();
+                            if (!string.IsNullOrWhiteSpace(mc.Name))
+                                p.Models.Add(mc);
+                        }
+                    }
+
                     providers[prop.Name] = p;
                 }
             }
