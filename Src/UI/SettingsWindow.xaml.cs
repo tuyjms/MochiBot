@@ -45,7 +45,6 @@ namespace MochiBot.Src.UI
             _providerTab = new ProviderTabController(_configReader, providersPanel);
             _personalityTab = new PersonalityTabController(
                 _configReader,
-                new ModelFetchService(_configReader),
                 personalitySelector, personNameBox, personDescBox, displayModeBox,
                 modelProviderBox, modelNameBox, chatModelsList,
                 subPersonalitiesGrid, weightSumLabel, activePersonalityBox);

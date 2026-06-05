@@ -169,8 +169,7 @@
                             </Grid.ColumnDefinitions>
                             <ComboBox x:Name="modelProviderBox" Grid.Column="0" Width="110" FontSize="13" Margin="0,0,4,0"
                                       SelectionChanged="ModelProviderBox_Changed"/>
-                            <ComboBox x:Name="modelNameBox" Grid.Column="1" FontSize="13" Margin="0,0,4,0"
-                                      IsEditable="True"/>
+                            <ComboBox x:Name="modelNameBox" Grid.Column="1" FontSize="13" Margin="0,0,4,0"/>
                             <Button Grid.Column="4" Content="+" Width="28" Height="26" FontSize="14" FontWeight="Bold"
                                     Click="AddChatModel_Click"/>
                         </Grid>

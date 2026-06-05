@@ -3,7 +3,6 @@ using System.Windows;
 using System.Windows.Controls;
 using MochiBot.Src.Core.Config;
 using MochiBot.Src.Core.Config.Models;
-using MochiBot.Src.Services;
 
 namespace MochiBot.Src.UI.Settings
 {
@@ -13,7 +12,6 @@ namespace MochiBot.Src.UI.Settings
     public class PersonalityTabController
     {
         private readonly IConfigReader _configReader;
-        private readonly ModelFetchService _modelFetchService;
 
         // UI 控件引用
         private readonly ComboBox _personalitySelector;
@@ -35,7 +33,6 @@ namespace MochiBot.Src.UI.Settings
 
         public PersonalityTabController(
             IConfigReader configReader,
-            ModelFetchService modelFetchService,
             ComboBox personalitySelector,
             TextBox personNameBox,
             TextBox personDescBox,
@@ -48,7 +45,6 @@ namespace MochiBot.Src.UI.Settings
             ComboBox activePersonalityBox)
         {
             _configReader = configReader;
-            _modelFetchService = modelFetchService;
             _personalitySelector = personalitySelector;
             _personNameBox = personNameBox;
             _personDescBox = personDescBox;
@@ -114,30 +110,29 @@ namespace MochiBot.Src.UI.Settings
             }
         }
 
-        /// <summary>从 API 获取模型列表填充下拉框</summary>
-        public async void OnProviderChanged()
+        /// <summary>切换提供商时，从模型注册表加载模型列表填充下拉框</summary>
+        public void OnProviderChanged()
         {
             var provider = _modelProviderBox.SelectedItem?.ToString();
             if (string.IsNullOrEmpty(provider)) return;
 
-            _modelNameBox.ItemsSource = null;
-            try
-            {
-                var models = await _modelFetchService.FetchModelsAsync(provider);
-                _modelNameBox.ItemsSource = models;
-                if (models.Count > 0)
-                    _modelNameBox.SelectedIndex = 0;
-            }
-            catch (Exception ex)
-            {
-                _configReader.Logger.Warn($"[Settings] 获取提供商 {provider} 的模型列表失败: {ex.Message}");
-            }
+            var providerConfig = _configReader.GetProvider(provider);
+            var models = providerConfig?.Models?
+                .Where(m => !string.IsNullOrWhiteSpace(m.Name))
+                .Select(m => m.Name)
+                .ToList() ?? new List<string>();
+
+            _modelNameBox.ItemsSource = models;
+            if (models.Count > 0)
+                _modelNameBox.SelectedIndex = 0;
+            else
+                _modelNameBox.ItemsSource = null;
         }
 
         public void AddChatModel()
         {
             var provider = _modelProviderBox.SelectedItem?.ToString()?.Trim();
-            var model = (_modelNameBox.SelectedItem?.ToString() ?? _modelNameBox.Text).Trim();
+            var model = _modelNameBox.SelectedItem?.ToString()?.Trim();
             if (string.IsNullOrEmpty(provider))
             {
                 MessageBox.Show("请先选择一个提供商", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -145,7 +140,7 @@ namespace MochiBot.Src.UI.Settings
             }
             if (string.IsNullOrEmpty(model))
             {
-                MessageBox.Show("请选择或输入模型名称", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("请先选择一个模型", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             var fullName = $"{provider}/{model}";
@@ -155,7 +150,6 @@ namespace MochiBot.Src.UI.Settings
                 return;
             }
             _chatModels.Add(fullName);
-            _modelNameBox.Text = string.Empty;
         }
 
         public void RemoveChatModel()
