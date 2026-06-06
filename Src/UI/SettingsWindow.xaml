@@ -138,13 +138,6 @@
                         <Label Content="名称" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,2"/>
                         <TextBox x:Name="personNameBox" Height="30" FontSize="14" Padding="6,0" Margin="0,0,0,10"/>
 
-                        <!-- 显示模式 -->
-                        <Label Content="显示模式" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                        <ComboBox x:Name="displayModeBox" Height="30" FontSize="14" Margin="0,0,0,10">
-                            <ComboBoxItem Content="GIF 动图" Tag="Gif"/>
-                            <ComboBoxItem Content="VRM 3D" Tag="Vrm"/>
-                        </ComboBox>
-
                         <!-- 描述 -->
                         <Label Content="人格描述" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,2"/>
                         <TextBox x:Name="personDescBox" FontSize="13" Padding="6,4" Margin="0,0,0,10"
@@ -263,14 +256,6 @@
                                     <TextBlock Grid.Column="0" Text="溢出策略" VerticalAlignment="Center" FontSize="13"/>
                                     <ComboBox Grid.Column="1" x:Name="stOverflowStrategyBox" Height="26" FontSize="13"/>
                                 </Grid>
-                                <Grid Margin="0,2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="120"/>
-                                        <ColumnDefinition Width="80"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="摘要保留数" VerticalAlignment="Center" FontSize="13"/>
-                                    <TextBox Grid.Column="1" x:Name="stSummaryReservedBox" Height="26" FontSize="13" TextAlignment="Center"/>
-                                </Grid>
                             </StackPanel>
                         </Expander>
 
@@ -363,6 +348,72 @@
                                     <TextBlock Grid.Column="0" Text="搜索返回数" VerticalAlignment="Center" FontSize="13"/>
                                     <TextBox Grid.Column="1" x:Name="ltSearchTopNBox" Height="26" FontSize="13" TextAlignment="Center"/>
                                 </Grid>
+                            </StackPanel>
+                        </Expander>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- Tab 5: 需重启 -->
+            <TabItem Header="⚙ 需重启">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="8">
+                    <StackPanel>
+                        <!-- 警告 Banner -->
+                        <Border Background="#FFFFF3CD" BorderBrush="#FFFFEEBA" BorderThickness="1"
+                                CornerRadius="4" Padding="10,8" Margin="0,0,0,12">
+                            <TextBlock Text="⚠ 以下设置修改后需要重启桌宠才能生效"
+                                       FontSize="13" FontWeight="SemiBold" Foreground="#FF856404"
+                                       TextWrapping="Wrap"/>
+                        </Border>
+
+                        <!-- 显示模式 -->
+                        <Expander Header="显示模式" IsExpanded="True" Margin="0,0,0,6">
+                            <StackPanel Margin="16,4,0,4">
+                                <Grid Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="120"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="显示模式" VerticalAlignment="Center" FontSize="13"/>
+                                    <ComboBox Grid.Column="1" x:Name="restartDisplayModeBox" Height="26" FontSize="13">
+                                        <ComboBoxItem Content="GIF 动图"/>
+                                        <ComboBoxItem Content="VRM 3D"/>
+                                    </ComboBox>
+                                </Grid>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- 摘要保留数 -->
+                        <Expander Header="短期记忆" IsExpanded="True" Margin="0,0,0,6">
+                            <StackPanel Margin="16,4,0,4">
+                                <Grid Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="80"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="摘要保留数" VerticalAlignment="Center" FontSize="13"/>
+                                    <TextBox Grid.Column="1" x:Name="restartSummaryReservedBox" Height="26" FontSize="13" TextAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- 定时任务 -->
+                        <Expander Header="定时任务" IsExpanded="True" Margin="0,0,0,6">
+                            <StackPanel Margin="16,4,0,4">
+                                <DataGrid x:Name="cronTasksGrid" AutoGenerateColumns="False"
+                                          CanUserAddRows="False" CanUserDeleteRows="False"
+                                          MinHeight="80" MaxHeight="200" FontSize="13"
+                                          SelectionMode="Single" Margin="0,0,0,4">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="名称" Binding="{Binding Name}" IsReadOnly="True" Width="80"/>
+                                        <DataGridTextColumn Header="类型" Binding="{Binding TaskType}" IsReadOnly="True" Width="70"/>
+                                        <DataGridTextColumn Header="Cron 表达式" Binding="{Binding CronExpression, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                                        <DataGridTextColumn Header="参数" Binding="{Binding Parameters, UpdateSourceTrigger=PropertyChanged}" Width="80"/>
+                                        <DataGridCheckBoxColumn Header="启用" Binding="{Binding Enabled, UpdateSourceTrigger=PropertyChanged}" Width="50"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                <TextBlock Text="定时任务的增删改需要重启生效；启用/禁用开关即时生效"
+                                           FontSize="11" Foreground="Gray" TextWrapping="Wrap"/>
                             </StackPanel>
                         </Expander>
                     </StackPanel>

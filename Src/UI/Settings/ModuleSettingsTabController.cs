@@ -16,7 +16,6 @@ namespace MochiBot.Src.UI.Settings
         private readonly TextBox _stCapacityBox;
         private readonly TextBox _stTrimThresholdBox;
         private readonly ComboBox _stOverflowStrategyBox;
-        private readonly TextBox _stSummaryReservedBox;
 
         // 中期记忆
         private readonly TextBox _mtMaxEntriesBox;
@@ -41,7 +40,7 @@ namespace MochiBot.Src.UI.Settings
         public ModuleSettingsTabController(
             IConfigReader configReader,
             TextBox stCapacityBox, TextBox stTrimThresholdBox,
-            ComboBox stOverflowStrategyBox, TextBox stSummaryReservedBox,
+            ComboBox stOverflowStrategyBox,
             TextBox mtMaxEntriesBox, TextBox mtImportanceThresholdBox,
             TextBox mtOverflowSampleRateBox, TextBox mtKeywordScanIntervalBox,
             TextBox mtTopKeywordsCountBox,
@@ -57,7 +56,6 @@ namespace MochiBot.Src.UI.Settings
             _stCapacityBox = stCapacityBox;
             _stTrimThresholdBox = stTrimThresholdBox;
             _stOverflowStrategyBox = stOverflowStrategyBox;
-            _stSummaryReservedBox = stSummaryReservedBox;
             _mtMaxEntriesBox = mtMaxEntriesBox;
             _mtImportanceThresholdBox = mtImportanceThresholdBox;
             _mtOverflowSampleRateBox = mtOverflowSampleRateBox;
@@ -83,7 +81,7 @@ namespace MochiBot.Src.UI.Settings
             _stTrimThresholdBox.Text = ms.ShortTermMemory_TrimThreshold.ToString();
             _stOverflowStrategyBox.ItemsSource = ModuleSettings.ValidOverflowStrategies;
             _stOverflowStrategyBox.SelectedItem = ms.ShortTermMemory_OverflowStrategy;
-            _stSummaryReservedBox.Text = ms.ShortTermMemory_SummaryReservedCount.ToString();
+            // SummaryReservedCount 由 RestartTabController 管理
 
             _mtMaxEntriesBox.Text = ms.MidTermMemory_MaxEntries.ToString();
             _mtImportanceThresholdBox.Text = ms.MidTermMemory_ImportanceThreshold.ToString();
@@ -120,10 +118,7 @@ namespace MochiBot.Src.UI.Settings
 
             ms.ShortTermMemory_OverflowStrategy = _stOverflowStrategyBox.SelectedItem?.ToString()
                 ?? new ModuleSettings().ShortTermMemory_OverflowStrategy;
-
-            if (!int.TryParse(_stSummaryReservedBox.Text, out var reserved) || reserved < 0)
-            { MessageBox.Show("摘要保留数必须为非负整数", "提示"); return false; }
-            ms.ShortTermMemory_SummaryReservedCount = reserved;
+            // SummaryReservedCount 由 RestartTabController 管理，此处保留原值
 
             if (!int.TryParse(_mtMaxEntriesBox.Text, out var mtMax) || mtMax < 1)
             { MessageBox.Show("中期记忆最大条目必须为正整数", "提示"); return false; }

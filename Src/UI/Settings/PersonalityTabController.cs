@@ -17,7 +17,6 @@ namespace MochiBot.Src.UI.Settings
         private readonly ComboBox _personalitySelector;
         private readonly TextBox _personNameBox;
         private readonly TextBox _personDescBox;
-        private readonly ComboBox _displayModeBox;
         private readonly ComboBox _modelProviderBox;
         private readonly ComboBox _modelNameBox;
         private readonly ListBox _chatModelsList;
@@ -40,7 +39,6 @@ namespace MochiBot.Src.UI.Settings
             ComboBox personalitySelector,
             TextBox personNameBox,
             TextBox personDescBox,
-            ComboBox displayModeBox,
             ComboBox modelProviderBox,
             ComboBox modelNameBox,
             ListBox chatModelsList,
@@ -55,7 +53,6 @@ namespace MochiBot.Src.UI.Settings
             _personalitySelector = personalitySelector;
             _personNameBox = personNameBox;
             _personDescBox = personDescBox;
-            _displayModeBox = displayModeBox;
             _modelProviderBox = modelProviderBox;
             _modelNameBox = modelNameBox;
             _chatModelsList = chatModelsList;
@@ -107,9 +104,6 @@ namespace MochiBot.Src.UI.Settings
             {
                 _personNameBox.Text = config.Name;
                 _personDescBox.Text = config.Description;
-
-                var displayMode = config.DisplayMode ?? "Gif";
-                _displayModeBox.SelectedIndex = displayMode == "Vrm" ? 1 : 0;
 
                 _chatModels = new ObservableCollection<string>(config.ChatModels ?? new List<string>());
                 _chatModelsList.ItemsSource = _chatModels;
@@ -319,7 +313,7 @@ namespace MochiBot.Src.UI.Settings
 
             config.Name = _personNameBox.Text.Trim();
             config.Description = _personDescBox.Text;
-            config.DisplayMode = (_displayModeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Gif";
+            // DisplayMode 由 RestartTabController 管理，此处保留原值
             config.ChatModels = _chatModels.ToList();
             config.VisionModels = _visionModels.Count > 0 ? _visionModels.ToList() : null;
             config.Personalities = _subPersonalities.Select(s => new SubPersonality

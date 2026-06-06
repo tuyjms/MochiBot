@@ -78,6 +78,9 @@ namespace MochiBot.Src.Core.Config
         /// <summary>保存模块参数配置到 appsettings.json</summary>
         void SaveModuleSettings(ModuleSettings settings);
 
+        /// <summary>保存定时任务配置到 appsettings.json</summary>
+        void SaveCronTasks(List<CronTask> tasks);
+
         /// <summary>保存人格配置到对应的 *_person.json 文件</summary>
         void SavePersonality(string personalityName, PersonalityConfig config);
 

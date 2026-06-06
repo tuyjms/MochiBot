@@ -25,6 +25,7 @@ namespace MochiBot.Src.UI
         private readonly ProviderTabController _providerTab;
         private readonly PersonalityTabController _personalityTab;
         private readonly ModuleSettingsTabController _moduleTab;
+        private readonly RestartTabController _restartTab;
 
         public SettingsWindow(
             IConfigReader configReader,
@@ -45,19 +46,22 @@ namespace MochiBot.Src.UI
             _providerTab = new ProviderTabController(_configReader, providersPanel);
             _personalityTab = new PersonalityTabController(
                 _configReader,
-                personalitySelector, personNameBox, personDescBox, displayModeBox,
+                personalitySelector, personNameBox, personDescBox,
                 modelProviderBox, modelNameBox, chatModelsList,
                 visionProviderBox, visionModelBox, visionModelsList,
                 subPersonalitiesGrid, weightSumLabel, activePersonalityBox);
             _moduleTab = new ModuleSettingsTabController(
                 _configReader,
-                stCapacityBox, stTrimThresholdBox, stOverflowStrategyBox, stSummaryReservedBox,
+                stCapacityBox, stTrimThresholdBox, stOverflowStrategyBox,
                 mtMaxEntriesBox, mtImportanceThresholdBox, mtOverflowSampleRateBox,
                 mtKeywordScanIntervalBox, mtTopKeywordsCountBox,
                 ltPromotionIntervalBox, ltPromotionThresholdBox,
                 ltImmediateThresholdBox, ltMaxEntriesBox, ltSearchTopNBox,
                 screenshotConsentCheck, autoScreenshotOnChatCheck,
                 screenshotOnLateNightCheck, screenshotOnEyeRestCheck);
+            _restartTab = new RestartTabController(
+                _configReader,
+                restartDisplayModeBox, restartSummaryReservedBox, cronTasksGrid);
 
             // 穿透模式滑条实时预览
             passthroughOpacitySlider.ValueChanged += PassthroughOpacitySlider_ValueChanged;
@@ -126,6 +130,10 @@ namespace MochiBot.Src.UI
             _personalityTab.Load(appSettings.ActivePersonality);
             _moduleTab.Load();
             UpdateVisionSubSwitchesEnabled();
+
+            // === Tab 5: 需重启 ===
+            var activePersonality = _configReader.LoadPersonality(appSettings.ActivePersonality);
+            _restartTab.Load(activePersonality);
         }
 
         // ==================== Tab 3: 人格编辑事件转发 ====================
@@ -284,6 +292,16 @@ namespace MochiBot.Src.UI
                 // ====== 5. 保存人格配置 ======
                 _personalityTab.SaveCurrent();
 
+                // ====== 6. 保存需重启项（DisplayMode → 人格文件、SummaryReservedCount → ModuleSettings、CronTasks） ======
+                var activePersonalityName = appSettings.ActivePersonality;
+                var currentPersonality = _configReader.LoadPersonality(activePersonalityName);
+                if (currentPersonality != null && _restartTab.TryCollect(currentPersonality, newModuleSettings))
+                {
+                    _configReader.SavePersonality(activePersonalityName, currentPersonality);
+                    _configReader.SaveModuleSettings(newModuleSettings);
+                    _configReader.SaveCronTasks(_restartTab.GetCronTasks());
+                }
+
                 // ====== 变更检测 ======
                 var changedItems = new List<string>();
 
@@ -314,6 +332,15 @@ namespace MochiBot.Src.UI
                 });
 
                 _configReader.Logger.Info("[Settings] 配置已保存并应用热重载");
+
+                // 需重启项提示
+                if (_restartTab.HasChanges())
+                {
+                    var changed = string.Join("、", _restartTab.GetChangedDescriptions());
+                    MessageBox.Show(
+                        $"以下设置已保存但需重启才能生效：\n\n• {changed}\n\n请手动重启桌宠使更改生效。",
+                        "需重启", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
 
                 DialogResult = true;
                 Close();

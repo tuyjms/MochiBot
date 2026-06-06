@@ -412,6 +412,45 @@ namespace MochiBot.Src.Core.Config
         }
 
         /// <summary>
+        /// 保存定时任务配置到 appsettings.json 并刷新缓存
+        /// </summary>
+        public void SaveCronTasks(List<CronTask> tasks)
+        {
+            try
+            {
+                var json = ReadAllTextWithRetry(_configPath);
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                var dict = new Dictionary<string, object?>();
+
+                foreach (var prop in root.EnumerateObject())
+                {
+                    if (prop.Name == "CronTasks")
+                    {
+                        dict["CronTasks"] = tasks;
+                    }
+                    else
+                    {
+                        dict[prop.Name] = JsonSerializer.Deserialize<object>(prop.Value.GetRawText());
+                    }
+                }
+
+                var newJson = JsonSerializer.Serialize(dict, options);
+                WriteAllTextWithRetry(_configPath, newJson);
+
+                Reload();
+                Logger.Info("[ConfigReader] 定时任务配置已保存");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("[ConfigReader] 保存定时任务配置失败", ex);
+                throw;
+            }
+        }
+
+        /// <summary>
         /// 保存人格配置到对应的 *_person.json 文件
         /// </summary>
         public void SavePersonality(string personalityName, PersonalityConfig config)
