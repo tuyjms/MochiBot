@@ -55,7 +55,9 @@ namespace MochiBot.Src.UI
                 mtMaxEntriesBox, mtImportanceThresholdBox, mtOverflowSampleRateBox,
                 mtKeywordScanIntervalBox, mtTopKeywordsCountBox,
                 ltPromotionIntervalBox, ltPromotionThresholdBox,
-                ltImmediateThresholdBox, ltMaxEntriesBox, ltSearchTopNBox);
+                ltImmediateThresholdBox, ltMaxEntriesBox, ltSearchTopNBox,
+                screenshotConsentCheck, autoScreenshotOnChatCheck,
+                screenshotOnLateNightCheck, screenshotOnEyeRestCheck);
 
             // 穿透模式滑条实时预览
             passthroughOpacitySlider.ValueChanged += PassthroughOpacitySlider_ValueChanged;
@@ -119,16 +121,11 @@ namespace MochiBot.Src.UI
             logToFileCheck.IsChecked = appSettings.LogToFile;
             logToConsoleCheck.IsChecked = appSettings.LogToConsole;
 
-            // 视觉功能
-            var moduleSettings = _configReader.GetModuleSettings();
-            autoScreenshotOnChatCheck.IsChecked = moduleSettings.Vision_AutoScreenshotOnChat;
-            screenshotOnLateNightCheck.IsChecked = moduleSettings.Vision_ScreenshotOnLateNight;
-            screenshotOnEyeRestCheck.IsChecked = moduleSettings.Vision_ScreenshotOnEyeRest;
-
             // === Tab 2~4: 委托给控制器 ===
             _providerTab.Load();
             _personalityTab.Load(appSettings.ActivePersonality);
             _moduleTab.Load();
+            UpdateVisionSubSwitchesEnabled();
         }
 
         // ==================== Tab 3: 人格编辑事件转发 ====================
@@ -186,6 +183,22 @@ namespace MochiBot.Src.UI
             _ownerWindow.SetPassthrough(passthroughCheck.IsChecked == true);
         }
 
+        // ==================== 视觉功能 ====================
+
+        private void ScreenshotConsentCheck_Changed(object sender, RoutedEventArgs e)
+        {
+            UpdateVisionSubSwitchesEnabled();
+        }
+
+        /// <summary>总闸关闭时禁用子开关，总闸开启时恢复</summary>
+        private void UpdateVisionSubSwitchesEnabled()
+        {
+            var enabled = screenshotConsentCheck.IsChecked == true;
+            autoScreenshotOnChatCheck.IsEnabled = enabled;
+            screenshotOnLateNightCheck.IsEnabled = enabled;
+            screenshotOnEyeRestCheck.IsEnabled = enabled;
+        }
+
         // ==================== 保存 ====================
 
         private async void SaveButton_Click(object sender, RoutedEventArgs e)
@@ -212,10 +225,7 @@ namespace MochiBot.Src.UI
             if (!_moduleTab.TryCollect(out var newModuleSettings))
                 return;
 
-            // Tab 1 中的视觉功能设置（不在 ModuleSettingsTabController 管辖范围内）
-            newModuleSettings.Vision_AutoScreenshotOnChat = autoScreenshotOnChatCheck.IsChecked == true;
-            newModuleSettings.Vision_ScreenshotOnLateNight = screenshotOnLateNightCheck.IsChecked == true;
-            newModuleSettings.Vision_ScreenshotOnEyeRest = screenshotOnEyeRestCheck.IsChecked == true;
+            // 视觉功能设置由 ModuleSettingsTabController 统一收集
 
             if (!_personalityTab.ValidateWeightSum())
                 return;

@@ -20,19 +20,44 @@ namespace MochiBot.Src.Services
             try
             {
                 var personality = configReader.GetActivePersonality();
-
-                // 检查 VisionModels 配置
-                if (personality?.VisionModels == null || personality.VisionModels.Count == 0)
+                if (personality == null)
                 {
                     _isAvailable = false;
-                    configReader.Logger.Warn("[VisionService] VisionModels 未配置，视觉功能不可用");
+                    configReader.Logger.Warn("[VisionService] 未找到激活人格，视觉功能不可用");
                     return;
                 }
 
-                var modelFullName = personality.VisionModels[0];
-                var (provider, model) = ParseModelName(modelFullName);
+                // VisionModels 为空时 fallback 到 ChatModels 的第一个
+                string? modelFullName = null;
+                if (personality.VisionModels != null && personality.VisionModels.Count > 0)
+                {
+                    modelFullName = personality.VisionModels[0];
+                }
+                else if (personality.ChatModels != null && personality.ChatModels.Count > 0)
+                {
+                    modelFullName = personality.ChatModels[0];
+                    configReader.Logger.Info($"[VisionService] VisionModels 未配置，fallback 到主聊天模型: {modelFullName}");
+                }
 
-                _visionLlmClient = new LlmClient(provider, model, configReader);
+                if (string.IsNullOrEmpty(modelFullName))
+                {
+                    _isAvailable = false;
+                    configReader.Logger.Warn("[VisionService] 无可用模型，视觉功能不可用");
+                    return;
+                }
+
+                var (provider, model) = ParseModelName(modelFullName);
+                var llmClient = new LlmClient(provider, model, configReader);
+
+                // 检查模型是否支持视觉输入
+                if (!llmClient.SupportsVision)
+                {
+                    _isAvailable = false;
+                    configReader.Logger.Warn($"[VisionService] 模型 {provider}/{model} 不支持视觉输入（SupportsVision=false）");
+                    return;
+                }
+
+                _visionLlmClient = llmClient;
                 _isAvailable = true;
                 configReader.Logger.Info($"[VisionService] 已初始化视觉模型: {provider}/{model}");
             }

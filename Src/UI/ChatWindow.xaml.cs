@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using MochiBot.Src.Core.Config;
 using MochiBot.Src.Core.Events;
 using MochiBot.Src.EventModels;
@@ -21,6 +22,8 @@ namespace MochiBot.Src.UI
         private readonly ChatHistoryRepository _chatHistoryRepo;
         private readonly ObservableCollection<ChatMessageItem> _messages = new();
         private string? _replySubscriptionId;
+        private readonly DispatcherTimer _searchDebounceTimer;
+        private bool _isSearchMode;
 
         /// <summary>
         /// 最新一条 agent 消息，供主窗口气泡显示
@@ -37,6 +40,13 @@ namespace MochiBot.Src.UI
             _eventDispatcher = eventDispatcher;
             _configReader = configReader;
             _chatHistoryRepo = chatHistoryRepo;
+
+            // 搜索防抖定时器
+            _searchDebounceTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(300)
+            };
+            _searchDebounceTimer.Tick += SearchDebounceTimer_Tick;
 
             InitializeComponent();
 
@@ -202,13 +212,14 @@ namespace MochiBot.Src.UI
         {
             try
             {
-                var history = await _chatHistoryRepo.LoadChatHistoryAsync(limit: 100);
+                var history = await _chatHistoryRepo.LoadChatHistoryWithIdAsync(limit: 100);
                 if (history.Count == 0) return;
 
-                foreach (var msg in history)
+                foreach (var (id, msg) in history)
                 {
                     _messages.Add(new ChatMessageItem
                     {
+                        Id = id,
                         Text = msg.Content,
                         IsUser = msg.Role == ChatRoles.User,
                         Alignment = msg.Role == ChatRoles.User
@@ -222,6 +233,146 @@ namespace MochiBot.Src.UI
             catch
             {
                 // 加载历史失败不影响正常使用
+            }
+        }
+
+        // ========== 搜索功能 ==========
+
+        private void SearchToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isSearchMode)
+            {
+                CloseSearchPanel();
+            }
+            else
+            {
+                OpenSearchPanel();
+            }
+        }
+
+        private void OpenSearchPanel()
+        {
+            _isSearchMode = true;
+            searchPanel.Visibility = Visibility.Visible;
+            searchBox.Focus();
+        }
+
+        private void CloseSearchPanel()
+        {
+            _isSearchMode = false;
+            searchPanel.Visibility = Visibility.Collapsed;
+            _searchDebounceTimer.Stop();
+            searchBox.Text = "";
+            // 恢复完整列表
+            _ = RestoreFullListAsync();
+        }
+
+        private void SearchCloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            CloseSearchPanel();
+        }
+
+        private void SearchBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            // 重置防抖定时器
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Start();
+        }
+
+        private void SearchBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape)
+            {
+                CloseSearchPanel();
+                e.Handled = true;
+            }
+        }
+
+        private async void SearchDebounceTimer_Tick(object? sender, EventArgs e)
+        {
+            _searchDebounceTimer.Stop();
+            var keyword = searchBox.Text.Trim();
+            if (string.IsNullOrEmpty(keyword)) return;
+
+            try
+            {
+                var results = await _chatHistoryRepo.SearchMessagesAsync(keyword);
+                _messages.Clear();
+                foreach (var (id, msg) in results)
+                {
+                    _messages.Add(new ChatMessageItem
+                    {
+                        Id = id,
+                        Text = msg.Content,
+                        IsUser = msg.Role == ChatRoles.User,
+                        Alignment = msg.Role == ChatRoles.User
+                            ? HorizontalAlignment.Right
+                            : HorizontalAlignment.Left
+                    });
+                }
+            }
+            catch
+            {
+                // 搜索失败静默处理
+            }
+        }
+
+        private async Task RestoreFullListAsync()
+        {
+            _messages.Clear();
+            await LoadHistoryAsync();
+        }
+
+        // ========== 删除功能 ==========
+
+        private async void DeleteMessage_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement { Tag: int id } || id <= 0) return;
+
+            try
+            {
+                await _chatHistoryRepo.DeleteMessageByIdAsync(id);
+                var item = _messages.FirstOrDefault(m => m.Id == id);
+                if (item != null)
+                    _messages.Remove(item);
+            }
+            catch
+            {
+                // 删除失败静默处理
+            }
+        }
+
+        // ========== 清空功能 ==========
+
+        private async void ClearButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_messages.Count == 0) return;
+
+            var result = System.Windows.MessageBox.Show(
+                "确定要清空所有聊天记录吗？此操作不可撤销。",
+                "确认清空",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            try
+            {
+                await _chatHistoryRepo.DeleteAllMessagesAsync();
+                _messages.Clear();
+
+                // 如果在搜索模式，退出搜索
+                if (_isSearchMode)
+                {
+                    _isSearchMode = false;
+                    searchPanel.Visibility = Visibility.Collapsed;
+                    _searchDebounceTimer.Stop();
+                    searchBox.Text = "";
+                }
+            }
+            catch
+            {
+                // 清空失败静默处理
             }
         }
 

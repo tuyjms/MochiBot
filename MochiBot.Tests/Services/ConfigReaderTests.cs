@@ -173,5 +173,22 @@ namespace MochiBot.Tests.Services
             Assert.NotNull(settings);
             Assert.Equal(50, settings.ShortTermMemory_Capacity);
         }
+
+        [Fact]
+        public void SaveModuleSettings_VisionConsent_ShouldRoundTrip()
+        {
+            var ms = ConfigReader.Instance.GetModuleSettings();
+            Assert.False(ms.Vision_ScreenshotConsent, "初始值应为 false");
+
+            ms.Vision_ScreenshotConsent = true;
+            ConfigReader.Instance.SaveModuleSettings(ms);
+
+            var reloaded = ConfigReader.Instance.GetModuleSettings();
+            Assert.True(reloaded.Vision_ScreenshotConsent, "保存后重载应为 true");
+
+            // 恢复
+            reloaded.Vision_ScreenshotConsent = false;
+            ConfigReader.Instance.SaveModuleSettings(reloaded);
+        }
     }
 }

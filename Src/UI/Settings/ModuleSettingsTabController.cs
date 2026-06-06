@@ -32,6 +32,12 @@ namespace MochiBot.Src.UI.Settings
         private readonly TextBox _ltMaxEntriesBox;
         private readonly TextBox _ltSearchTopNBox;
 
+        // 视觉功能
+        private readonly CheckBox _screenshotConsentCheck;
+        private readonly CheckBox _autoScreenshotOnChatCheck;
+        private readonly CheckBox _screenshotOnLateNightCheck;
+        private readonly CheckBox _screenshotOnEyeRestCheck;
+
         public ModuleSettingsTabController(
             IConfigReader configReader,
             TextBox stCapacityBox, TextBox stTrimThresholdBox,
@@ -41,7 +47,11 @@ namespace MochiBot.Src.UI.Settings
             TextBox mtTopKeywordsCountBox,
             TextBox ltPromotionIntervalBox, TextBox ltPromotionThresholdBox,
             TextBox ltImmediateThresholdBox, TextBox ltMaxEntriesBox,
-            TextBox ltSearchTopNBox)
+            TextBox ltSearchTopNBox,
+            CheckBox screenshotConsentCheck,
+            CheckBox autoScreenshotOnChatCheck,
+            CheckBox screenshotOnLateNightCheck,
+            CheckBox screenshotOnEyeRestCheck)
         {
             _configReader = configReader;
             _stCapacityBox = stCapacityBox;
@@ -58,6 +68,10 @@ namespace MochiBot.Src.UI.Settings
             _ltImmediateThresholdBox = ltImmediateThresholdBox;
             _ltMaxEntriesBox = ltMaxEntriesBox;
             _ltSearchTopNBox = ltSearchTopNBox;
+            _screenshotConsentCheck = screenshotConsentCheck;
+            _autoScreenshotOnChatCheck = autoScreenshotOnChatCheck;
+            _screenshotOnLateNightCheck = screenshotOnLateNightCheck;
+            _screenshotOnEyeRestCheck = screenshotOnEyeRestCheck;
         }
 
         /// <summary>加载模块参数到 UI</summary>
@@ -82,12 +96,19 @@ namespace MochiBot.Src.UI.Settings
             _ltImmediateThresholdBox.Text = ms.LongTermMemory_ImmediateThreshold.ToString();
             _ltMaxEntriesBox.Text = ms.LongTermMemory_MaxEntries.ToString();
             _ltSearchTopNBox.Text = ms.LongTermMemory_SearchTopN.ToString();
+
+            // 视觉功能
+            _screenshotConsentCheck.IsChecked = ms.Vision_ScreenshotConsent;
+            _autoScreenshotOnChatCheck.IsChecked = ms.Vision_AutoScreenshotOnChat;
+            _screenshotOnLateNightCheck.IsChecked = ms.Vision_ScreenshotOnLateNight;
+            _screenshotOnEyeRestCheck.IsChecked = ms.Vision_ScreenshotOnEyeRest;
         }
 
         /// <summary>从 UI 收集并校验模块参数，失败返回 false</summary>
         public bool TryCollect(out ModuleSettings ms)
         {
-            ms = new ModuleSettings();
+            // 基于当前缓存设置修改，保留 Tab 4 不管辖的字段（如视觉功能）
+            ms = _configReader.GetModuleSettings();
 
             if (!int.TryParse(_stCapacityBox.Text, out var cap) || cap < 1)
             { MessageBox.Show("短期记忆容量必须为正整数", "提示"); return false; }
@@ -143,6 +164,12 @@ namespace MochiBot.Src.UI.Settings
             if (!int.TryParse(_ltSearchTopNBox.Text, out var ltSearch) || ltSearch < 1)
             { MessageBox.Show("长期记忆搜索返回数必须为正整数", "提示"); return false; }
             ms.LongTermMemory_SearchTopN = ltSearch;
+
+            // 视觉功能
+            ms.Vision_ScreenshotConsent = _screenshotConsentCheck.IsChecked == true;
+            ms.Vision_AutoScreenshotOnChat = _autoScreenshotOnChatCheck.IsChecked == true;
+            ms.Vision_ScreenshotOnLateNight = _screenshotOnLateNightCheck.IsChecked == true;
+            ms.Vision_ScreenshotOnEyeRest = _screenshotOnEyeRestCheck.IsChecked == true;
 
             return true;
         }

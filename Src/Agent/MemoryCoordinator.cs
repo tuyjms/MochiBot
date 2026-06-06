@@ -145,6 +145,34 @@ namespace MochiBot.Src.Agent
             _configReader.Logger.Info($"[Memory] 短期记忆容量已调整为: {capacity}");
         }
 
+        /// <summary>
+        /// 配置热重载：更新短期记忆溢出策略
+        /// </summary>
+        public void UpdateOverflowStrategy()
+        {
+            var strategyStr = _configReader.GetModuleSettings().ShortTermMemory_OverflowStrategy;
+            if (Enum.TryParse<OverflowStrategy>(strategyStr, true, out var strategy))
+            {
+                ShortTermMemory.OverflowStrategy = strategy;
+                _configReader.Logger.Info($"[Memory] 溢出策略已更新为: {strategy}");
+            }
+        }
+
+        /// <summary>
+        /// 配置热重载：重建长期记忆维护定时器（PromotionInterval 变更时调用）
+        /// </summary>
+        public void RestartMaintenanceTimer()
+        {
+            var promotionInterval = _configReader.GetModuleSettings().LongTermMemory_PromotionInterval;
+            _maintenanceTimer?.Dispose();
+            _maintenanceTimer = new Timer(
+                async _ => await RunMemoryMaintenanceAsync(),
+                null,
+                TimeSpan.FromMinutes(promotionInterval),
+                TimeSpan.FromMinutes(promotionInterval));
+            _configReader.Logger.Info($"[Memory] 维护定时器已重启，间隔: {promotionInterval} 分钟");
+        }
+
         /// <summary>从数据库预热短期记忆（启动时加载最近的聊天记录）</summary>
         private async Task WarmUpFromDatabaseAsync()
         {

@@ -39,11 +39,44 @@
                         <TextBlock x:Name="characterNameText" Text="小琪" FontSize="15" FontWeight="SemiBold"/>
                         <TextBlock Text="在线" FontSize="11" Foreground="#FF4CAF50"/>
                     </StackPanel>
-                    <!-- 关闭按钮 -->
-                    <Button Grid.Column="2" Content="✕" Width="30" Height="30"
-                            FontSize="14" Background="Transparent" BorderThickness="0"
-                            Foreground="#FF888888" Click="CloseButton_Click"
-                            VerticalAlignment="Center"/>
+                    <!-- 工具按钮 -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button x:Name="searchToggleButton" Content="🔍" Width="30" Height="30"
+                                FontSize="13" Background="Transparent" BorderThickness="0"
+                                Foreground="#FF888888" Click="SearchToggleButton_Click"
+                                ToolTip="搜索聊天记录"/>
+                        <Button x:Name="clearButton" Content="🗑️" Width="30" Height="30"
+                                FontSize="13" Background="Transparent" BorderThickness="0"
+                                Foreground="#FF888888" Click="ClearButton_Click"
+                                ToolTip="清空聊天记录"/>
+                        <Button Content="✕" Width="30" Height="30"
+                                FontSize="14" Background="Transparent" BorderThickness="0"
+                                Foreground="#FF888888" Click="CloseButton_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 搜索栏（默认折叠） -->
+            <Border x:Name="searchPanel" Grid.Row="1" Background="#FFFFFFFF"
+                    BorderBrush="#FFE0E0E0" BorderThickness="0,0,0,1"
+                    Visibility="Collapsed" VerticalAlignment="Top">
+                <Grid Margin="8,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="searchBox" Grid.Column="0"
+                             Height="32" FontSize="13"
+                             VerticalContentAlignment="Center"
+                             Padding="8,0"
+                             BorderBrush="#FFD0D0D0"
+                             TextChanged="SearchBox_TextChanged"
+                             KeyDown="SearchBox_KeyDown"/>
+                    <Button x:Name="searchCloseButton" Grid.Column="1"
+                            Content="✕" Width="28" Height="32"
+                            FontSize="12" Background="Transparent" BorderThickness="0"
+                            Foreground="#FF888888" Click="SearchCloseButton_Click"
+                            Margin="4,0,0,0"/>
                 </Grid>
             </Border>
 
@@ -73,6 +106,12 @@
                     <DataTemplate>
                         <!-- Grid.Stretch 保证子元素测量时获得有限宽度，TextWrapping 生效 -->
                         <Grid>
+                            <Grid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="删除此消息" Click="DeleteMessage_Click"
+                                              Tag="{Binding Id}"/>
+                                </ContextMenu>
+                            </Grid.ContextMenu>
                             <Border CornerRadius="10" Margin="8,4"
                                     MaxWidth="280"
                                     Padding="10,8"

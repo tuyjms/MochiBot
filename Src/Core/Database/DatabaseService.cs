@@ -68,6 +68,7 @@ namespace MochiBot.Src.Core.Database
                 Content     TEXT NOT NULL,
                 Timestamp   TEXT NOT NULL
             );
+            CREATE INDEX IF NOT EXISTS idx_chat_timestamp ON chat_history(Timestamp);
             """;
             cmd2.ExecuteNonQuery();
 

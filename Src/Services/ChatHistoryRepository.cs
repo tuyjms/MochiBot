@@ -88,5 +88,88 @@ namespace MochiBot.Src.Services
             result.Reverse();
             return result;
         }
+
+        /// <summary>加载历史聊天记录（带 Id，支持分页）</summary>
+        public async Task<List<(int Id, ChatMessage Message)>> LoadChatHistoryWithIdAsync(int limit = 50, int offset = 0)
+        {
+            var result = new List<(int Id, ChatMessage Message)>();
+
+            await using var connection = CreateConnection();
+            await connection.OpenAsync();
+
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT Id, Role, Content, Timestamp FROM chat_history ORDER BY Id DESC LIMIT @Limit OFFSET @Offset";
+            cmd.Parameters.AddWithValue("@Limit", limit);
+            cmd.Parameters.AddWithValue("@Offset", offset);
+
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var id = reader.GetInt32(0);
+                var msg = new ChatMessage
+                {
+                    Role = reader.GetString(1),
+                    Content = reader.GetString(2),
+                    Timestamp = DateTime.Parse(reader.GetString(3))
+                };
+                result.Add((id, msg));
+            }
+
+            result.Reverse();
+            return result;
+        }
+
+        /// <summary>按关键词搜索聊天记录</summary>
+        public async Task<List<(int Id, ChatMessage Message)>> SearchMessagesAsync(string keyword, int limit = 100)
+        {
+            var result = new List<(int Id, ChatMessage Message)>();
+
+            await using var connection = CreateConnection();
+            await connection.OpenAsync();
+
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT Id, Role, Content, Timestamp FROM chat_history WHERE Content LIKE @Keyword ORDER BY Id DESC LIMIT @Limit";
+            cmd.Parameters.AddWithValue("@Keyword", $"%{keyword}%");
+            cmd.Parameters.AddWithValue("@Limit", limit);
+
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var id = reader.GetInt32(0);
+                var msg = new ChatMessage
+                {
+                    Role = reader.GetString(1),
+                    Content = reader.GetString(2),
+                    Timestamp = DateTime.Parse(reader.GetString(3))
+                };
+                result.Add((id, msg));
+            }
+
+            result.Reverse();
+            return result;
+        }
+
+        /// <summary>按主键删除单条消息</summary>
+        public async Task DeleteMessageByIdAsync(int id)
+        {
+            await using var connection = CreateConnection();
+            await connection.OpenAsync();
+
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM chat_history WHERE Id = @Id";
+            cmd.Parameters.AddWithValue("@Id", id);
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        /// <summary>清空全部聊天记录</summary>
+        public async Task DeleteAllMessagesAsync()
+        {
+            await using var connection = CreateConnection();
+            await connection.OpenAsync();
+
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "DELETE FROM chat_history";
+            await cmd.ExecuteNonQueryAsync();
+        }
     }
 }

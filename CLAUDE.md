@@ -17,7 +17,7 @@ PowerShell 环境下 `&&` 不可用，用 `;` 分隔命令。
 
 本项目已配置 CodeGraph MCP 服务器（`codegraph_*` 工具），它是一个基于 tree-sitter 解析的代码知识图谱，索引了所有符号、调用关系和文件结构。
 
-- **查看代码改动代码时必须优先使用 CodeGraph**——无论是查找符号、理解调用关系、追踪数据流、查找功能实现还是分析影响范围，都先用 `codegraph_*` 工具，**禁止**先用 Grep/Read/Agent 做文件扫描再人工拼凑
+- **一切与代码相关的操作必须时必须优先使用 CodeGraph**——无论是查找符号、理解调用关系、追踪数据流、查找功能实现还是分析影响范围，都先用 `codegraph_*` 工具，**禁止**先用 Grep/Read/Agent 做文件扫描再人工拼凑
 - 不要用 grep 去验证 codegraph 的结果——它来自 AST 解析，比文本搜索更准确
 - 不要对多个符号逐个调用 `codegraph_node`，用 `codegraph_explore` 一次获取
 - 如果 `.codegraph/` 目录不存在，提示用户运行 `codegraph init -i` 构建索引

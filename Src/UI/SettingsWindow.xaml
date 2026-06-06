@@ -97,6 +97,8 @@
 
                         <!-- 视觉功能 -->
                         <Label Content="视觉功能" FontSize="13" FontWeight="SemiBold" Margin="0,6,0,2"/>
+                        <CheckBox x:Name="screenshotConsentCheck" Content="允许截取屏幕画面（视觉功能总闸）" FontSize="13" Margin="0,2"
+                                  Checked="ScreenshotConsentCheck_Changed" Unchecked="ScreenshotConsentCheck_Changed"/>
                         <CheckBox x:Name="autoScreenshotOnChatCheck" Content="聊天时自动截图" FontSize="13" Margin="0,2"/>
                         <CheckBox x:Name="screenshotOnLateNightCheck" Content="深夜关怀时截图" FontSize="13" Margin="0,2"/>
                         <CheckBox x:Name="screenshotOnEyeRestCheck" Content="用眼提醒时截图" FontSize="13" Margin="0,2,0,10"/>

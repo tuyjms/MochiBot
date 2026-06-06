@@ -3,15 +3,50 @@ using System.IO;
 namespace MochiBot.Src.Core
 {
     /// <summary>
-    /// 应用程序路径解析（兼容 PublishSingleFile 模式）
-    /// 单文件自解压时 BaseDirectory 指向临时解压目录，Resources 随之释放
+    /// 应用程序路径解析
+    /// 优先使用项目根目录的 Resources（开发/调试时配置统一），
+    /// 回退到 BaseDirectory（单文件发布、独立运行时 Resources 随之释放）
     /// </summary>
     public static class AppPaths
     {
+        private static string? _resolvedBaseDir;
+
         /// <summary>
-        /// 获取程序基目录（单文件模式下为临时解压目录，Resources 随之释放）
+        /// 获取程序基目录：
+        /// 1. 若 BaseDirectory 是构建输出目录（bin/Debug 或 bin/Release），
+        ///    自动向上定位到项目根目录，确保配置文件统一在源码 Resources/ 下管理
+        /// 2. 否则使用 BaseDirectory（单文件发布、正常安装等场景）
         /// </summary>
-        public static string ExeDirectory => AppDomain.CurrentDomain.BaseDirectory;
+        public static string ExeDirectory
+        {
+            get
+            {
+                if (_resolvedBaseDir != null) return _resolvedBaseDir;
+
+                var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                var candidate = baseDir;
+
+                // 向上查找包含 Resources/appsettings.json 的最近祖先目录
+                // 最多向上 4 层，避免遍历整棵目录树
+                for (int i = 0; i < 4; i++)
+                {
+                    var resourcesPath = Path.Combine(candidate, "Resources", "appsettings.json");
+                    if (File.Exists(resourcesPath))
+                    {
+                        _resolvedBaseDir = candidate;
+                        return _resolvedBaseDir;
+                    }
+
+                    var parent = Path.GetDirectoryName(candidate);
+                    if (parent == null || parent == candidate) break;
+                    candidate = parent;
+                }
+
+                // 回退：使用原始 BaseDirectory
+                _resolvedBaseDir = baseDir;
+                return _resolvedBaseDir;
+            }
+        }
 
         /// <summary>
         /// 获取 Resources 目录路径

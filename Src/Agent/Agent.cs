@@ -37,7 +37,7 @@ namespace MochiBot.Src.Agent
         private readonly PromptBuilder _promptBuilder;
         private readonly EventProcessingQueue _eventQueue;
         private readonly AutoEventFilter _autoEventFilter;
-        private readonly VisionService _visionService;
+        private VisionService _visionService;
         private readonly MemoryCoordinator _memoryCoordinator;
         private readonly ChatHistoryRepository _chatHistoryRepo;
         private string _lastJsonError = string.Empty;
@@ -177,43 +177,69 @@ namespace MochiBot.Src.Agent
                     _chatLlmClient = CreateChatLlmClient();
                     ResolveFunctionModel();
                     _memoryCoordinator.RebuildMemories(_functionProviderName, _functionModelName);
-
-                    _actionExecutor = new ActionExecutor(
-                        _toolService,
-                        mood => _moodManager.ChangeMoodByEvent(mood.ToString()),
-                        (tag, name) => _memoryCoordinator.ShortTermMemory.AddMessage(ChatRoles.System, $"{tag} {name}"),
-                        anim =>
-                        {
-                            _eventQueue.LastEvent = $"animation:{anim}";
-                            _eventDispatcher.Publish(new EventData
-                            {
-                                Category = EventCategory.MoodChange,
-                                Trigger = EventTrigger.Tool,
-                                Info = JsonSerializer.Serialize(new { animation = anim, source = EventSources.Tool })
-                            });
-                        });
+                    RebuildActionExecutor();
 
                     _configReader.Logger.Info("[Agent] ProviderConfig 已变更，所有 LlmClient 和记忆模块已重建");
                 }
 
-                // 检查人格配置是否变更（刷新人格描述）
+                // 检查人格文件是否切换（需要重建 LlmClient + VisionService）
+                if (items.Contains("ActivePersonality"))
+                {
+                    _personality = _configReader.GetActivePersonality();
+                    _currentSubPersonality = SelectSubPersonalityByWeight();
+
+                    // 人格切换可能改变 ChatModels/VisionModels/FunctionModels
+                    _chatLlmClient = CreateChatLlmClient();
+                    _visionService = new VisionService(_configReader);
+                    ResolveFunctionModel();
+                    _memoryCoordinator.RebuildMemories(_functionProviderName, _functionModelName);
+                    RebuildActionExecutor();
+
+                    _configReader.Logger.Info("[Agent] ActivePersonality 已切换，LlmClient + VisionService + 记忆模块已重建");
+                }
+
+                // 检查人格配置内容是否变更（刷新描述 + 重建 VisionService）
                 if (items.Contains("PersonalityConfig"))
                 {
                     _personality = _configReader.GetActivePersonality();
                     _currentSubPersonality = SelectSubPersonalityByWeight();
-                    _configReader.Logger.Info("[Agent] 人格配置已刷新");
+                    // VisionModels/ChatModels 可能已变更，重建 VisionService
+                    _visionService = new VisionService(_configReader);
+                    _configReader.Logger.Info("[Agent] 人格配置已刷新，VisionService 已重建");
                 }
 
-                // 检查 MaxMessages 是否变更
-                if (items.Contains("MaxMessages") && _personality != null)
+                // 检查模块设置是否变更（记忆参数 + 维护定时器）
+                if (items.Contains("ModuleSettings"))
                 {
-                    _memoryCoordinator.UpdateCapacity(_personality.MaxMessages);
+                    if (_personality != null)
+                        _memoryCoordinator.UpdateCapacity(_personality.MaxMessages);
+                    _memoryCoordinator.UpdateOverflowStrategy();
+                    _memoryCoordinator.RestartMaintenanceTimer();
                 }
             }
             catch (Exception ex)
             {
                 _configReader.Logger.Error($"[Agent] 处理配置变更事件失败", ex);
             }
+        }
+
+        /// <summary>重建 ActionExecutor（工具/插件/动画执行器）</summary>
+        private void RebuildActionExecutor()
+        {
+            _actionExecutor = new ActionExecutor(
+                _toolService,
+                mood => _moodManager.ChangeMoodByEvent(mood.ToString()),
+                (tag, name) => _memoryCoordinator.ShortTermMemory.AddMessage(ChatRoles.System, $"{tag} {name}"),
+                anim =>
+                {
+                    _eventQueue.LastEvent = $"animation:{anim}";
+                    _eventDispatcher.Publish(new EventData
+                    {
+                        Category = EventCategory.MoodChange,
+                        Trigger = EventTrigger.Tool,
+                        Info = JsonSerializer.Serialize(new { animation = anim, source = EventSources.Tool })
+                    });
+                });
         }
 
         /// <summary>
