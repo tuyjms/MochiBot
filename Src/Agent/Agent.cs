@@ -336,16 +336,28 @@ namespace MochiBot.Src.Agent
                         return;
                 }
 
-                // ===== 视觉注入：截图 → VisionModel → 文字描述 =====
+                // ===== 视觉注入 =====
                 // screenDescription 不混入 userMessage，避免进入记忆系统和聊天历史
+                byte[]? screenshotBytes = null;
                 string? screenDescription = null;
                 var visionSettings = _configReader.GetModuleSettings();
                 if (ScreenshotPolicy.ShouldCapture(eventData, visionSettings))
                 {
-                    screenDescription = await _visionService.TryDescribeScreenAsync();
+                    if (_chatLlmClient.SupportsVision)
+                    {
+                        // 聊天模型支持视觉 → 直接截取图片，后续作为多模态消息发送
+                        screenshotBytes = ScreenshotService.CaptureScreen(_configReader);
+                        if (screenshotBytes != null)
+                            _configReader.Logger.Debug("[Agent] 聊天模型支持视觉，将直传截图图片");
+                    }
+                    else
+                    {
+                        // 聊天模型不支持视觉 → 走 VisionService 文字转义
+                        screenDescription = await _visionService.TryDescribeScreenAsync();
+                    }
                 }
 
-                await ProcessWithLlmAsync(eventData, userMessage, screenDescription);
+                await ProcessWithLlmAsync(eventData, userMessage, screenDescription, screenshotBytes);
 
                 // 更新情绪（根据用户交互内容和时间自动判断）
                 if (eventData.Category == EventCategory.UserInput)
@@ -366,7 +378,7 @@ namespace MochiBot.Src.Agent
         private const int MaxToolLoopIterations = 5;
 
         /// <summary>使用 LLM 处理事件（含工具调用循环）</summary>
-        private async Task ProcessWithLlmAsync(EventData eventData, string userMessage, string? screenDescription = null)
+        private async Task ProcessWithLlmAsync(EventData eventData, string userMessage, string? screenDescription = null, byte[]? imageBytes = null)
         {
             // 1. 记录原始用户消息到短期记忆（不含截图描述）
             _memoryCoordinator.ShortTermMemory.AddMessage(ChatRoles.User, userMessage);
@@ -415,7 +427,21 @@ namespace MochiBot.Src.Agent
                     new() { Role = ChatRoles.User, Content = userContext }
                 };
 
-                var response = await CallLlmChatAsync(messages);
+                // 转换为 OpenAI 消息格式
+                var openAiMessages = messages.Select(m => m.Role switch
+                {
+                    ChatRoles.System => (OpenAiChatMessage)new OpenAiSystemChatMessage(m.Content),
+                    ChatRoles.User => new OpenAiUserChatMessage(m.Content),
+                    ChatRoles.Assistant => new OpenAiAssistantChatMessage(m.Content),
+                    _ => new OpenAiUserChatMessage(m.Content)
+                }).ToList();
+
+                // 首次调用且有截图图片 → 多模态消息直传图片
+                string response;
+                if (iteration == 0 && imageBytes != null && imageBytes.Length > 0)
+                    response = await _chatLlmClient.SendChatWithImageAsync(openAiMessages, imageBytes);
+                else
+                    response = await _chatLlmClient.SendChatAsync(openAiMessages);
                 lastRawResponse = response;
 
                 // 3c. 解析 LLM 响应
@@ -543,19 +569,6 @@ namespace MochiBot.Src.Agent
             return GetChatModel();
         }
 
-        /// <summary>调用 LLM 对话模式</summary>
-        private async Task<string> CallLlmChatAsync(List<ChatMessage> messages)
-        {
-            var openAiMessages = messages.Select(m => m.Role switch
-            {
-                ChatRoles.System => (OpenAiChatMessage)new OpenAiSystemChatMessage(m.Content),
-                ChatRoles.User => new OpenAiUserChatMessage(m.Content),
-                ChatRoles.Assistant => new OpenAiAssistantChatMessage(m.Content),
-                _ => new OpenAiUserChatMessage(m.Content)
-            }).ToList();
-
-            return await _chatLlmClient.SendChatAsync(openAiMessages);
-        }
 
         /// <summary>解析 LLM 响应，提取回复文本和 actions</summary>
         private (string reply, List<AgentAction>? actions) ParseResponse(string response)

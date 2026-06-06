@@ -85,6 +85,35 @@ namespace MochiBot.Src.Services
             return await CallLlmAsync(messages);
         }
 
+        /// <summary>发送包含图片的多模态消息列表（供 Agent 直传截图使用）</summary>
+        /// <remarks>将最后一条 UserChatMessage 替换为文本+图片的多模态版本，其余消息原样保留</remarks>
+        public virtual async Task<string> SendChatWithImageAsync(List<ChatMessage> messages, byte[] imageBytes)
+        {
+            var finalMessages = new List<ChatMessage>();
+            for (int i = 0; i < messages.Count; i++)
+            {
+                if (i == messages.Count - 1 && messages[i] is UserChatMessage userMsg)
+                {
+                    // 提取原始文本内容
+                    var textContent = string.Join("", userMsg.Content
+                        .Where(p => p.Kind == ChatMessageContentPartKind.Text)
+                        .Select(p => p.Text));
+                    // 构建多模态消息：文本 + 图片
+                    var parts = new List<ChatMessageContentPart>
+                    {
+                        ChatMessageContentPart.CreateTextPart(textContent),
+                        ChatMessageContentPart.CreateImagePart(System.BinaryData.FromBytes(imageBytes), "image/png")
+                    };
+                    finalMessages.Add(new UserChatMessage(parts));
+                }
+                else
+                {
+                    finalMessages.Add(messages[i]);
+                }
+            }
+            return await CallLlmAsync(finalMessages);
+        }
+
         /// <summary>实际的 LLM 调用（可被子类重写以模拟网络行为）</summary>
         protected virtual async Task<string> CallLlmAsync(List<ChatMessage> messages)
         {
